@@ -3,12 +3,20 @@ import { NextResponse } from 'next/server';
 export async function POST(request: Request) {
   try {
     const { passcode } = await request.json();
-    const adminSecret = process.env.ADMIN_SECRET_CODE || 'ahlssouss2026';
+    const adminSecret = process.env.ADMIN_SECRET_CODE;
+
+    // Strictly enforce ADMIN_SECRET_CODE environment variable
+    if (!adminSecret || !adminSecret.trim()) {
+      return NextResponse.json(
+        { success: false, message: 'رمز الدخول السري غير مهيأ في إعدادات الخادم (ADMIN_SECRET_CODE غير معرف)' },
+        { status: 500 }
+      );
+    }
 
     if (passcode && passcode.trim() === adminSecret.trim()) {
       const response = NextResponse.json({ success: true });
 
-      // Set HTTP-only session cookie valid for 30 days
+      // Set HTTP-only authentication session cookie valid for 30 days
       response.cookies.set('session_auth', 'authenticated', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
