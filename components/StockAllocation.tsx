@@ -211,39 +211,60 @@ export default function StockAllocation({
       {selectedProduct && (
         <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm space-y-4 animate-in fade-in duration-200">
           
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-xl p-4">
-            <div>
-              <span className="text-xs text-slate-500 block">السلعة المختارة:</span>
-              <h3 className="font-extrabold text-slate-900 text-base">{selectedProduct}</h3>
-              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                <p className="text-xs text-slate-600">
-                  مطلوبة لـ <span className="font-bold text-slate-900">{waitingItems.length}</span> زبناء • إجمالي المعلق: <span className="font-bold text-slate-900">{totalRequired}</span> قطعة
-                </p>
-                {matchedMasterProd && (
-                  <span className="bg-sky-50 text-sky-800 border border-sky-200 font-extrabold text-[11px] px-2 py-0.5 rounded-md">
-                    الكمية المتوفرة بالرفوف: {matchedMasterProd.available_stock || 0} قطعة
-                  </span>
-                )}
-              </div>
-            </div>
+          {/* Selected Item Summary Card with Centered Big Circular Stock Badge */}
+          {(() => {
+            const availableStockCount = matchedMasterProd?.available_stock || 0;
+            return (
+              <div className="flex flex-col md:flex-row items-center justify-between gap-4 md:gap-6 bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm">
+                
+                {/* 1. Item Details */}
+                <div className="text-center md:text-right w-full md:w-auto">
+                  <span className="text-xs text-slate-500 font-bold block mb-0.5">السلعة المختارة:</span>
+                  <h3 className="font-extrabold text-slate-900 text-base sm:text-lg">{selectedProduct}</h3>
+                  <p className="text-xs text-slate-600 mt-1">
+                    مطلوبة لـ <span className="font-bold text-slate-900">{waitingItems.length}</span> زبناء • إجمالي المعلق: <span className="font-bold text-slate-900">{totalRequired}</span> قطعة
+                  </p>
+                </div>
 
-            <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-3">
-              <div className="text-right">
-                <span className="text-[10px] text-slate-500 block">القطع المحددة للتوزيع</span>
-                <span className={`text-base font-black ${currentSelectedQty <= receivedQty ? 'text-emerald-700' : 'text-rose-700'}`}>
-                  {currentSelectedQty} / {receivedQty}
-                </span>
-              </div>
+                {/* 2. Big Circular Stock Badge (Centered) */}
+                <div className="flex flex-col items-center justify-center shrink-0 my-1 md:my-0 mx-auto">
+                  <div 
+                    className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white border-4 ${
+                      availableStockCount > 3
+                        ? 'border-sky-500 text-sky-600 shadow-sky-100'
+                        : availableStockCount > 0
+                        ? 'border-amber-500 text-amber-600 shadow-amber-100'
+                        : 'border-slate-300 text-slate-400 shadow-slate-100'
+                    } shadow-md flex flex-col items-center justify-center p-2 text-center transition-transform hover:scale-105`}
+                  >
+                    <span className="text-2xl sm:text-3xl font-black leading-none">{availableStockCount}</span>
+                    <span className="text-[10px] sm:text-[11px] font-extrabold text-slate-600 mt-1 leading-tight text-center">
+                      الكمية المتوفرة بالرفوف
+                    </span>
+                  </div>
+                </div>
 
-              <button
-                onClick={handleSelectAll}
-                disabled={waitingItems.length === 0}
-                className="bg-white border border-slate-300 hover:border-slate-400 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl transition-colors shadow-sm disabled:opacity-50 min-h-[44px]"
-              >
-                <span>{selectedItemIds.length === waitingItems.length ? 'إلغاء التحديد' : 'تحديد الممكن'}</span>
-              </button>
-            </div>
-          </div>
+                {/* 3. Allocation Counter & Selection Action */}
+                <div className="flex items-center justify-between md:justify-end w-full md:w-auto gap-3 border-t md:border-t-0 border-slate-200 pt-3 md:pt-0">
+                  <div className="text-right">
+                    <span className="text-[10px] text-slate-500 block font-bold">القطع المحددة للتوزيع</span>
+                    <span className={`text-base font-black ${currentSelectedQty <= receivedQty ? 'text-emerald-700' : 'text-rose-700'}`}>
+                      {currentSelectedQty} / {receivedQty}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={handleSelectAll}
+                    disabled={waitingItems.length === 0}
+                    className="bg-white border border-slate-300 hover:border-slate-400 text-slate-700 text-xs font-bold px-3.5 py-2.5 rounded-xl transition-colors shadow-sm disabled:opacity-50 min-h-[44px]"
+                  >
+                    <span>{selectedItemIds.length === waitingItems.length ? 'إلغاء التحديد' : 'تحديد الممكن'}</span>
+                  </button>
+                </div>
+
+              </div>
+            );
+          })()}
 
           {waitingItems.length === 0 ? (
             <div className="text-center py-8 border-2 border-dashed border-slate-200 rounded-xl">
