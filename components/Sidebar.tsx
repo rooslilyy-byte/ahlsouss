@@ -11,7 +11,8 @@ import {
   FileText, 
   Phone, 
   Menu, 
-  X
+  X,
+  LogOut
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -89,9 +90,24 @@ export default function Sidebar({ isSupabaseActive }: SidebarProps) {
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-slate-800 text-[11px] text-slate-500 text-center">
-        نظام خصاصات المكتبة POS v2.0
+      {/* Footer & Logout */}
+      <div className="p-4 border-t border-slate-800 space-y-2">
+        <button
+          onClick={async () => {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/login';
+          }}
+          className="w-full text-slate-400 hover:text-rose-400 hover:bg-slate-800/80 px-3 py-2 rounded-xl text-xs font-bold transition-colors flex items-center justify-between border border-transparent hover:border-rose-900/40 min-h-[44px]"
+        >
+          <span className="flex items-center gap-2">
+            <LogOut className="w-4 h-4 text-slate-400" />
+            <span>تسجيل الخروج</span>
+          </span>
+        </button>
+
+        <div className="text-[10px] text-slate-500 text-center">
+          نظام خصاصات المكتبة POS v2.0
+        </div>
       </div>
     </div>
   );

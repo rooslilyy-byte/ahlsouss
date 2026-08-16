@@ -115,6 +115,9 @@ CREATE TRIGGER trg_update_demand_status
 AFTER INSERT OR UPDATE OR DELETE ON public.demand_items
 FOR EACH ROW EXECUTE FUNCTION update_client_demand_status();
 
+-- Add available_stock column if missing
+ALTER TABLE public.master_products ADD COLUMN IF NOT EXISTS available_stock INTEGER DEFAULT 0;
+
 -- Enable Row Level Security (RLS) and allow anonymous dashboard access
 ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.master_products ENABLE ROW LEVEL SECURITY;
@@ -122,8 +125,17 @@ ALTER TABLE public.purchase_batches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.client_demands ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.demand_items ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Public full access clients" ON public.clients;
 CREATE POLICY "Public full access clients" ON public.clients FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public full access master_products" ON public.master_products;
 CREATE POLICY "Public full access master_products" ON public.master_products FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public full access purchase_batches" ON public.purchase_batches;
 CREATE POLICY "Public full access purchase_batches" ON public.purchase_batches FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public full access client_demands" ON public.client_demands;
 CREATE POLICY "Public full access client_demands" ON public.client_demands FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public full access demand_items" ON public.demand_items;
 CREATE POLICY "Public full access demand_items" ON public.demand_items FOR ALL USING (true) WITH CHECK (true);

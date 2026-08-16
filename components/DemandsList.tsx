@@ -244,7 +244,8 @@ export default function DemandsList({
                         <button
                           type="button"
                           onClick={() => handleItemChange(idx, 'quantity', Math.max(1, item.quantity - 1))}
-                          className="px-3 py-2 text-slate-600 hover:bg-slate-100 font-bold min-h-[44px] min-w-[44px] flex items-center justify-center"
+                          disabled={item.quantity <= 1}
+                          className="px-3 py-2 text-slate-600 hover:bg-slate-100 font-bold min-h-[44px] min-w-[44px] flex items-center justify-center disabled:opacity-40 transition-opacity"
                         >
                           <Minus className="w-4 h-4" />
                         </button>
@@ -252,12 +253,17 @@ export default function DemandsList({
                           type="number"
                           min="1"
                           value={item.quantity}
-                          onChange={(e) => handleItemChange(idx, 'quantity', parseInt(e.target.value) || 1)}
+                          onKeyDown={(e) => {
+                            if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') {
+                              e.preventDefault();
+                            }
+                          }}
+                          onChange={(e) => handleItemChange(idx, 'quantity', Math.max(1, parseInt(e.target.value) || 1))}
                           className="w-full text-center text-sm font-black text-slate-900 focus:outline-none"
                         />
                         <button
                           type="button"
-                          onClick={() => handleItemChange(idx, 'quantity', item.quantity + 1)}
+                          onClick={() => handleItemChange(idx, 'quantity', Math.max(1, item.quantity + 1))}
                           className="px-3 py-2 text-slate-600 hover:bg-slate-100 font-bold min-h-[44px] min-w-[44px] flex items-center justify-center"
                         >
                           <Plus className="w-4 h-4" />

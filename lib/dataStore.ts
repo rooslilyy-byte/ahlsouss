@@ -258,7 +258,7 @@ export async function createClientDemand(
         const demandItems = items.map(it => ({
           demand_id: demand.id,
           product_name: it.product_name,
-          quantity: it.quantity,
+          quantity: Math.max(1, Math.floor(it.quantity || 1)),
           is_in_stock: false,
           is_delivered: false,
         }));
@@ -390,12 +390,13 @@ export async function updateClientDemand(
       }
 
       for (const item of items) {
+        const validQty = Math.max(1, Math.floor(item.quantity || 1));
         if (item.id) {
           await supabase
             .from('demand_items')
             .update({
               product_name: item.product_name.trim(),
-              quantity: item.quantity,
+              quantity: validQty,
               is_in_stock: item.is_in_stock ?? false,
               is_delivered: item.is_delivered ?? false,
             })
@@ -404,7 +405,7 @@ export async function updateClientDemand(
           await supabase.from('demand_items').insert({
             demand_id: demandId,
             product_name: item.product_name.trim(),
-            quantity: item.quantity,
+            quantity: validQty,
             is_in_stock: item.is_in_stock ?? false,
             is_delivered: item.is_delivered ?? false,
           });

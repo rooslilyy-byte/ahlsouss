@@ -192,6 +192,11 @@ export default function StockAllocation({
               type="number"
               min="1"
               value={receivedQty}
+              onKeyDown={(e) => {
+                if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') {
+                  e.preventDefault();
+                }
+              }}
               onChange={(e) => {
                 setReceivedQty(Math.max(1, parseInt(e.target.value) || 1));
                 setSelectedItemIds([]);
