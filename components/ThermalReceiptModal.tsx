@@ -1,0 +1,196 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { Printer, X } from 'lucide-react';
+import { ClientDemand } from '@/lib/types';
+
+interface ThermalReceiptModalProps {
+  demand: ClientDemand;
+  onClose: () => void;
+}
+
+export default function ThermalReceiptModal({ demand, onClose }: ThermalReceiptModalProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const formattedDate = new Date().toLocaleDateString('ar-MA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'completed': return 'مكتمل التسليم';
+      case 'partial': return 'تسليم جزئي';
+      default: return 'قيد الانتظار';
+    }
+  };
+
+  const renderSingleReceiptCopy = (copyType: 'نسخة الزبون' | 'نسخة المكتبة') => (
+    <div className="receipt-single-copy bg-white text-black font-cairo dir-rtl p-1 mb-2">
+      {/* Top Center Logo */}
+      <div className="text-center mb-2">
+        <img 
+          src="/logo.png" 
+          alt="شعار مكتبة وراقة اهل سوس" 
+          className="w-auto h-12 max-w-[45mm] max-h-[22mm] mx-auto mb-1 object-contain grayscale contrast-125 block" 
+        />
+        <h2 className="font-extrabold text-sm sm:text-base tracking-tight leading-snug text-black">
+          مكتبة وراقة اهل سوس
+        </h2>
+        <p className="text-[10px] font-semibold text-slate-700">متابعة خصاصات الدخول المدرسي</p>
+        <p className="text-[10px] font-extrabold dir-ltr font-mono mt-0.5 text-black">0675502660</p>
+        
+        <div className="receipt-divider border-t border-dashed border-black my-1.5"></div>
+        
+        <div className="inline-block border border-black px-2.5 py-0.5 text-[10px] font-black bg-slate-100 text-black">
+          وصل خصاص — {copyType}
+        </div>
+      </div>
+
+      {/* Metadata Box */}
+      <div className="border border-dashed border-black p-2 rounded text-[10px] space-y-1 mb-2.5 text-black bg-white">
+        <div className="flex justify-between items-center">
+          <span className="font-extrabold">الزبون:</span>
+          <span className="font-bold">{demand.client?.name || 'غير مسمى'}</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="font-extrabold">الهاتف:</span>
+          <span className="font-mono dir-ltr font-bold">{demand.client?.phone}</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="font-extrabold">تاريخ الطلب:</span>
+          <span className="font-medium">{new Date(demand.created_at || Date.now()).toLocaleDateString('ar-MA')}</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="font-extrabold">حالة الطلب:</span>
+          <span className="font-black">{getStatusText(demand.status)}</span>
+        </div>
+      </div>
+
+      {/* Items Table */}
+      <table className="w-full text-right text-[9.5px] border-collapse mb-2 text-black">
+        <thead>
+          <tr className="border-b-2 border-black font-black">
+            <th className="py-1 px-0.5 text-center w-5">#</th>
+            <th className="py-1 px-1">الكتاب / السلعة</th>
+            <th className="py-1 px-0.5 text-center w-8">الكمية</th>
+            <th className="py-1 px-0.5 text-center w-12">التسليم</th>
+          </tr>
+        </thead>
+        <tbody>
+          {demand.items?.map((item, idx) => (
+            <tr key={item.id || idx} className="border-b border-slate-300">
+              <td className="py-1 px-0.5 text-center font-bold">{idx + 1}</td>
+              <td className="py-1 px-1 font-semibold leading-tight">{item.product_name}</td>
+              <td className="py-1 px-0.5 text-center font-black">{item.quantity}</td>
+              <td className="py-1 px-0.5 text-center">
+                {item.is_delivered ? (
+                  <span className="font-extrabold text-black">✓ مسلَم</span>
+                ) : item.is_in_stock ? (
+                  <span className="font-bold text-black">بالمتجر</span>
+                ) : (
+                  <span className="font-normal text-slate-700">معلق</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Signatures Side-by-Side */}
+      <div className="pt-2 border-t border-dashed border-black text-[9.5px] flex justify-between items-end mt-2 text-black">
+        <div className="text-right">
+          <p className="font-extrabold">توقيع الزبون:</p>
+          <div className="h-6 w-20 border-b border-slate-400 mt-1"></div>
+        </div>
+        <div className="text-left">
+          <p className="font-extrabold">توقيع البائع:</p>
+          <div className="h-6 w-20 border-b border-slate-400 mt-1"></div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="text-center pt-2 border-t border-slate-300 text-[8.5px] text-slate-800 mt-2">
+        <p>طبع بتاريخ {formattedDate}</p>
+        <p className="font-semibold mt-0.5">شكراً لزيارتكم مكتبة وراقة اهل سوس</p>
+      </div>
+    </div>
+  );
+
+  const cuttingLine = (
+    <div className="my-3 text-center text-[9px] font-mono border-t-2 border-b-2 border-dashed border-black py-1 bg-white text-black font-extrabold dir-rtl">
+      ✂ - - - - - - - - - - - - - - - - - - - - - - - - ✂
+      <span className="block text-[8.5px] font-extrabold font-cairo mt-0.5">خط القص | Cut Line</span>
+    </div>
+  );
+
+  const printableContent = (
+    <div id="printable-thermal-receipt" className="print-only">
+      {renderSingleReceiptCopy('نسخة الزبون')}
+      {cuttingLine}
+      {renderSingleReceiptCopy('نسخة المكتبة')}
+    </div>
+  );
+
+  return (
+    <>
+      {/* SCREEN MODAL VIEW (NO-PRINT) */}
+      <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 modal-backdrop no-print">
+        <div className="bg-slate-900 text-slate-100 rounded-t-3xl sm:rounded-2xl p-4 sm:p-6 max-w-lg w-full max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-200">
+          
+          {/* Modal Header Controls */}
+          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+            <div className="flex items-center gap-2 text-slate-200 font-bold text-sm sm:text-base">
+              <Printer className="w-5 h-5 text-slate-400" />
+              <span>طباعة وصل خصاص (80mm Thermal)</span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handlePrint}
+                className="bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-2 border border-slate-700 shadow"
+              >
+                <Printer className="w-4 h-4 text-slate-300" />
+                <span>طباعة الآن (نسختين)</span>
+              </button>
+              <button
+                onClick={onClose}
+                className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 text-xs font-bold"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Scrollable Receipt Preview */}
+          <div className="overflow-y-auto p-4 flex-1 my-2 bg-slate-800/50 rounded-xl flex flex-col items-center">
+            <div className="receipt-preview-container bg-white p-3 rounded-lg shadow max-w-[72mm] w-full text-black">
+              {renderSingleReceiptCopy('نسخة الزبون')}
+              {cuttingLine}
+              {renderSingleReceiptCopy('نسخة المكتبة')}
+            </div>
+          </div>
+
+          <div className="pt-2 text-xs text-slate-400 text-center">
+            المقاس المجهز: 80mm Roll • يطبع تلقائياً نسختين (واحدة للزبون والأخرى للمكتبة).
+          </div>
+        </div>
+      </div>
+
+      {/* DEDICATED PRINTABLE PORTAL DIRECTLY AT DOCUMENT BODY */}
+      {mounted && createPortal(printableContent, document.body)}
+    </>
+  );
+}
