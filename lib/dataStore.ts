@@ -11,6 +11,95 @@ import {
 // Helper to determine if we are running in browser context to fetch API route
 const isBrowser = typeof window !== 'undefined';
 
+export interface FullStoreData {
+  activeBatch: PurchaseBatch;
+  masterProducts: MasterProduct[];
+  demands: ClientDemand[];
+}
+
+let storeCache: { data: FullStoreData | null; timestamp: number } = {
+  data: null,
+  timestamp: 0,
+};
+
+let pendingStorePromise: Promise<FullStoreData> | null = null;
+
+export function invalidateStoreCache(): void {
+  storeCache.data = null;
+  storeCache.timestamp = 0;
+}
+
+export async function getFullStoreData(forceRefresh = false): Promise<FullStoreData> {
+  const now = Date.now();
+  // Return cached data if fresh (less than 3000ms old) and not forced
+  if (!forceRefresh && storeCache.data && (now - storeCache.timestamp < 3000)) {
+    return storeCache.data;
+  }
+
+  // If a request is already in-flight, re-use its promise to prevent duplicate requests
+  if (pendingStorePromise) {
+    return pendingStorePromise;
+  }
+
+  pendingStorePromise = (async () => {
+    try {
+      if (isBrowser) {
+        const res = await fetch('/api/store', { method: 'GET', cache: 'no-store' });
+        const data = await res.json();
+        if (data.success) {
+          const fullData: FullStoreData = {
+            activeBatch: data.activeBatch || { id: 'batch-001', batch_name: 'دفعة الدخول المدرسي الرئيسي', is_archived: false },
+            masterProducts: data.masterProducts || [],
+            demands: data.demands || [],
+          };
+          storeCache = { data: fullData, timestamp: Date.now() };
+          return fullData;
+        }
+      }
+
+      // Supabase Direct Fallback
+      let batch: PurchaseBatch = { id: 'batch-001', batch_name: 'دفعة الدخول المدرسي الرئيسي', is_archived: false };
+      let masterProducts: MasterProduct[] = [];
+      let demands: ClientDemand[] = [];
+
+      if (isSupabaseConfigured) {
+        const { data: bData } = await supabase
+          .from('purchase_batches')
+          .select('*')
+          .eq('is_archived', false)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        if (bData) batch = bData;
+
+        const { data: mpData } = await supabase
+          .from('master_products')
+          .select('*')
+          .order('name');
+        if (mpData) masterProducts = mpData;
+
+        const { data: dData } = await supabase
+          .from('client_demands')
+          .select(`
+            *,
+            client:clients(*),
+            items:demand_items(*)
+          `)
+          .order('created_at', { ascending: false });
+        if (dData) demands = dData as ClientDemand[];
+      }
+
+      const fullData: FullStoreData = { activeBatch: batch, masterProducts, demands };
+      storeCache = { data: fullData, timestamp: Date.now() };
+      return fullData;
+    } finally {
+      pendingStorePromise = null;
+    }
+  })();
+
+  return pendingStorePromise;
+}
+
 async function fetchStoreApi(action: string, payload: Record<string, any> = {}) {
   const res = await fetch('/api/store', {
     method: 'POST',
@@ -21,25 +110,14 @@ async function fetchStoreApi(action: string, payload: Record<string, any> = {}) 
   if (!res.ok || !data.success) {
     throw new Error(data.message || 'Database request failed');
   }
+  invalidateStoreCache();
   return data;
 }
 
 // --- MASTER PRODUCTS ---
-export async function getMasterProducts(): Promise<MasterProduct[]> {
-  if (isBrowser) {
-    const res = await fetch('/api/store', { method: 'GET', cache: 'no-store' });
-    const data = await res.json();
-    if (data.success && data.masterProducts) {
-      return data.masterProducts;
-    }
-  }
-
-  if (isSupabaseConfigured) {
-    const { data } = await supabase.from('master_products').select('*').order('name');
-    if (data) return data;
-  }
-
-  return [];
+export async function getMasterProducts(forceRefresh = false): Promise<MasterProduct[]> {
+  const data = await getFullStoreData(forceRefresh);
+  return data.masterProducts;
 }
 
 export async function addMasterProduct(name: string, category: string = 'كتاب مدرسي'): Promise<MasterProduct> {
@@ -55,6 +133,7 @@ export async function addMasterProduct(name: string, category: string = 'كتا�
       .upsert({ name: trimmedName, category }, { onConflict: 'name' })
       .select()
       .single();
+    invalidateStoreCache();
     if (data) return data;
   }
 
@@ -74,31 +153,14 @@ export async function updateMasterProductStock(productName: string, deltaQty: nu
       const current = data.available_stock || 0;
       await supabase.from('master_products').update({ available_stock: Math.max(0, current + deltaQty) }).eq('id', data.id);
     }
+    invalidateStoreCache();
   }
 }
 
 // --- BATCHES ---
-export async function getActiveBatch(): Promise<PurchaseBatch> {
-  if (isBrowser) {
-    const res = await fetch('/api/store', { method: 'GET', cache: 'no-store' });
-    const data = await res.json();
-    if (data.success && data.activeBatch) {
-      return data.activeBatch;
-    }
-  }
-
-  if (isSupabaseConfigured) {
-    const { data } = await supabase
-      .from('purchase_batches')
-      .select('*')
-      .eq('is_archived', false)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-    if (data) return data;
-  }
-
-  return { id: 'batch-001', batch_name: 'دفعة الدخول المدرسي الرئيسي', is_archived: false };
+export async function getActiveBatch(forceRefresh = false): Promise<PurchaseBatch> {
+  const data = await getFullStoreData(forceRefresh);
+  return data.activeBatch;
 }
 
 export async function archiveActiveBatch(newBatchName: string): Promise<PurchaseBatch> {
@@ -112,6 +174,7 @@ export async function archiveActiveBatch(newBatchName: string): Promise<Purchase
     const now = new Date().toISOString();
     await supabase.from('purchase_batches').update({ is_archived: true, archived_at: now }).eq('id', active.id);
     const { data } = await supabase.from('purchase_batches').insert({ batch_name: newBatchName, is_archived: false }).select().single();
+    invalidateStoreCache();
     if (data) return data;
   }
 
@@ -119,38 +182,12 @@ export async function archiveActiveBatch(newBatchName: string): Promise<Purchase
 }
 
 // --- CLIENT DEMANDS ---
-export async function getClientDemands(batchId?: string): Promise<ClientDemand[]> {
-  if (isBrowser) {
-    const res = await fetch('/api/store', { method: 'GET', cache: 'no-store' });
-    const data = await res.json();
-    if (data.success && data.demands) {
-      let result: ClientDemand[] = data.demands;
-      if (batchId) {
-        result = result.filter(d => d.batch_id === batchId);
-      }
-      return result;
-    }
+export async function getClientDemands(batchId?: string, forceRefresh = false): Promise<ClientDemand[]> {
+  const data = await getFullStoreData(forceRefresh);
+  if (batchId) {
+    return data.demands.filter(d => d.batch_id === batchId);
   }
-
-  if (isSupabaseConfigured) {
-    let query = supabase
-      .from('client_demands')
-      .select(`
-        *,
-        client:clients(*),
-        items:demand_items(*)
-      `)
-      .order('created_at', { ascending: false });
-
-    if (batchId) {
-      query = query.eq('batch_id', batchId);
-    }
-
-    const { data } = await query;
-    if (data) return data as ClientDemand[];
-  }
-
-  return [];
+  return data.demands;
 }
 
 export async function createClientDemand(
@@ -191,6 +228,7 @@ export async function createClientDemand(
         await supabase.from('demand_items').insert(demandItems);
       }
     }
+    invalidateStoreCache();
   }
 }
 
@@ -205,7 +243,97 @@ export async function updateDemandItemState(
 
   if (isSupabaseConfigured) {
     await supabase.from('demand_items').update(updates).eq('id', itemId);
+    invalidateStoreCache();
   }
+}
+
+export async function autoAllocateStock(
+  productName: string,
+  receivedQty: number
+): Promise<{ clientName: string; phone: string; fulfilledQty: number; link: string }[]> {
+  const cleanName = productName.trim();
+  const qty = Math.max(1, Math.floor(receivedQty));
+
+  if (isBrowser) {
+    const data = await fetchStoreApi('auto_allocate_stock', { productName: cleanName, receivedQty: qty });
+    return data.allocatedClients || [];
+  }
+
+  if (isSupabaseConfigured) {
+    const activeBatch = await getActiveBatch();
+    const { data: demands } = await supabase
+      .from('client_demands')
+      .select('id, created_at, client:clients(*), items:demand_items(*)')
+      .eq('batch_id', activeBatch.id)
+      .order('created_at', { ascending: true });
+
+    let remaining = qty;
+    const allocatedMap: Record<string, { clientName: string; phone: string; totalFulfilled: number }> = {};
+
+    if (demands) {
+      for (const dem of demands) {
+        if (remaining <= 0) break;
+        if (!dem.items || !dem.client) continue;
+        const cli: any = Array.isArray(dem.client) ? dem.client[0] : dem.client;
+        if (!cli || !cli.phone) continue;
+
+        for (const item of dem.items) {
+          if (remaining <= 0) break;
+          if (
+            item.product_name.trim().toLowerCase() === cleanName.toLowerCase() &&
+            !item.is_in_stock &&
+            !item.is_delivered
+          ) {
+            const needed = item.quantity;
+            if (remaining >= needed) {
+              await supabase.from('demand_items').update({ is_in_stock: true }).eq('id', item.id);
+              remaining -= needed;
+
+              const key = cli.phone;
+              if (!allocatedMap[key]) {
+                allocatedMap[key] = { clientName: cli.name, phone: cli.phone, totalFulfilled: 0 };
+              }
+              allocatedMap[key].totalFulfilled += needed;
+            } else {
+              const fulfilled = remaining;
+              const missingLeft = needed - fulfilled;
+
+              await supabase.from('demand_items').update({ quantity: missingLeft, is_in_stock: false }).eq('id', item.id);
+              await supabase.from('demand_items').insert({ demand_id: dem.id, product_name: cleanName, quantity: fulfilled, is_in_stock: true, is_delivered: false });
+
+              remaining = 0;
+
+              const key = cli.phone;
+              if (!allocatedMap[key]) {
+                allocatedMap[key] = { clientName: cli.name, phone: cli.phone, totalFulfilled: 0 };
+              }
+              allocatedMap[key].totalFulfilled += fulfilled;
+            }
+          }
+        }
+      }
+    }
+
+    if (remaining > 0) {
+      await updateMasterProductStock(cleanName, remaining);
+    }
+
+    invalidateStoreCache();
+
+    return Object.values(allocatedMap).map(c => {
+      let rawPhone = c.phone.replace(/\D/g, '');
+      if (rawPhone.startsWith('0')) rawPhone = '212' + rawPhone.slice(1);
+      const message = `السلام عليكم ورحمة الله وبركاته السيد(ة) ${c.clientName}،\n\nنخبركم من مكتبة وراقة اهل سوس أن كتاب / مستلزم: "${cleanName}" (عدد: ${c.totalFulfilled}) الذي طلبتموه قد وصل للمحل وهو جاهز للتسليم!\n\nالمكان: مكتبة وراقة اهل سوس\nالهاتف: 0675502660`;
+      return {
+        clientName: c.clientName,
+        phone: c.phone,
+        fulfilledQty: c.totalFulfilled,
+        link: `https://wa.me/${rawPhone}?text=${encodeURIComponent(message)}`,
+      };
+    });
+  }
+
+  return [];
 }
 
 export async function deleteClientDemand(demandId: string): Promise<void> {
@@ -216,6 +344,7 @@ export async function deleteClientDemand(demandId: string): Promise<void> {
 
   if (isSupabaseConfigured) {
     await supabase.from('client_demands').delete().eq('id', demandId);
+    invalidateStoreCache();
   }
 }
 
@@ -265,6 +394,7 @@ export async function updateClientDemand(
         }
       }
     }
+    invalidateStoreCache();
   }
 }
 

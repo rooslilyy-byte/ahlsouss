@@ -7,9 +7,10 @@ import SupplierBuyingSheet from '@/components/SupplierBuyingSheet';
 export default function ReportsPage() {
   return (
     <AppShell>
-      {({ activeBatch, handleArchiveBatch }) => (
+      {({ activeBatch, demands, handleArchiveBatch }) => (
         <SupplierBuyingSheet
           activeBatch={activeBatch}
+          demands={demands}
           onArchiveBatch={handleArchiveBatch}
         />
       )}

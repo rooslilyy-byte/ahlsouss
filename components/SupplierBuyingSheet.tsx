@@ -1,24 +1,23 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Printer, FileText, ShoppingCart, Users, RefreshCw, Archive } from 'lucide-react';
-import { SupplierAggregatedItem, PurchaseBatch } from '@/lib/types';
+import { Printer, FileText, ShoppingCart, Users } from 'lucide-react';
+import { SupplierAggregatedItem, PurchaseBatch, ClientDemand } from '@/lib/types';
 import { getSupplierAggregatedReport } from '@/lib/dataStore';
 
 interface SupplierBuyingSheetProps {
   activeBatch: PurchaseBatch | null;
-  onArchiveBatch: (newBatchName: string) => void;
+  demands?: ClientDemand[];
+  onArchiveBatch?: (newBatchName: string) => void;
 }
 
 export default function SupplierBuyingSheet({
   activeBatch,
-  onArchiveBatch,
+  demands,
 }: SupplierBuyingSheetProps) {
-  const [report, setReport] = useState<SupplierAggregatedItem[]>([]);
+  const [fetchedReport, setFetchedReport] = useState<SupplierAggregatedItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showArchiveModal, setShowArchiveModal] = useState(false);
-  const [newBatchName, setNewBatchName] = useState('');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -29,26 +28,56 @@ export default function SupplierBuyingSheet({
     setIsLoading(true);
     try {
       const data = await getSupplierAggregatedReport(activeBatch?.id);
-      setReport(data);
+      setFetchedReport(data);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchReport();
-  }, [activeBatch]);
+    if (!demands) {
+      fetchReport();
+    } else {
+      setIsLoading(false);
+    }
+  }, [activeBatch, demands]);
+
+  const computedReport = useMemo(() => {
+    if (!demands) return null;
+    const itemMap: Record<string, SupplierAggregatedItem> = {};
+
+    for (const dem of demands) {
+      if (!dem.items || !dem.client) continue;
+
+      for (const item of dem.items) {
+        if (item.is_delivered || item.is_in_stock) continue;
+
+        const pName = item.product_name.trim();
+        if (!itemMap[pName]) {
+          itemMap[pName] = {
+            productName: pName,
+            totalQuantity: 0,
+            clients: [],
+          };
+        }
+
+        itemMap[pName].totalQuantity += item.quantity;
+        itemMap[pName].clients.push({
+          clientName: dem.client.name,
+          phone: dem.client.phone,
+          quantity: item.quantity,
+          demandId: dem.id,
+        });
+      }
+    }
+
+    return Object.values(itemMap).sort((a, b) => b.totalQuantity - a.totalQuantity);
+  }, [demands]);
+
+  const report = computedReport !== null ? computedReport : fetchedReport;
 
   const handlePrint = () => {
     window.print();
-  };
-
-  const handleArchiveSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newBatchName.trim()) return;
-    onArchiveBatch(newBatchName.trim());
-    setNewBatchName('');
-    setShowArchiveModal(false);
   };
 
   const totalItemTypes = report.length;
@@ -77,28 +106,12 @@ export default function SupplierBuyingSheet({
           </p>
         </div>
 
-        {/* Page-level action buttons */}
+        {/* Page-level action buttons: ONLY A4 Print button */}
         <div className="flex items-center gap-2 flex-wrap w-full md:w-auto justify-end">
-          <button
-            onClick={fetchReport}
-            className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-2.5 px-3 rounded-xl flex items-center gap-1.5 transition-colors border border-slate-200"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>تحديث البيانات</span>
-          </button>
-
-          <button
-            onClick={() => setShowArchiveModal(true)}
-            className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold py-2.5 px-3.5 rounded-xl flex items-center gap-1.5 transition-colors shadow-sm"
-          >
-            <Archive className="w-3.5 h-3.5 text-amber-400" />
-            <span>أرشفة القائمة</span>
-          </button>
-
           <button
             onClick={handlePrint}
             disabled={report.length === 0}
-            className="bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold py-2.5 px-4 rounded-xl shadow-md flex items-center gap-2 transition-all disabled:opacity-50"
+            className="bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold py-2.5 px-4 rounded-xl shadow-md flex items-center gap-2 transition-all disabled:opacity-50 min-h-[44px]"
           >
             <Printer className="w-4 h-4 text-white" />
             <span>طباعة القائمة A4</span>
@@ -205,48 +218,6 @@ export default function SupplierBuyingSheet({
           </>
         )}
       </div>
-
-      {/* Archive Batch Modal (NO-PRINT) */}
-      {showArchiveModal && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 no-print">
-          <div className="bg-slate-900 border border-slate-800 text-slate-100 rounded-2xl p-6 max-w-md w-full shadow-2xl">
-            <div className="flex items-center gap-3 text-amber-400 mb-4">
-              <Archive className="w-6 h-6" />
-              <h3 className="text-lg font-bold">أرشفة الدفعة الحالية وبدء جديدة</h3>
-            </div>
-            <form onSubmit={handleArchiveSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  اسم الدفعة الجديدة:
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="مثال: طلبية شتنتبر / الأسبوع الثاني"
-                  value={newBatchName}
-                  onChange={(e) => setNewBatchName(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500"
-                />
-              </div>
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowArchiveModal(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white rounded-lg"
-                >
-                  إلغاء
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 text-xs font-bold bg-slate-800 hover:bg-slate-700 text-white rounded-lg border border-slate-700"
-                >
-                  تأكيد الأرشفة
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* DEDICATED PRINTABLE PORTAL DIRECTLY AT DOCUMENT BODY */}
       {mounted && createPortal(

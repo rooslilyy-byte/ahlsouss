@@ -23,6 +23,7 @@ import {
 import { ClientDemand, MasterProduct } from '@/lib/types';
 import ThermalReceiptModal from './ThermalReceiptModal';
 import EditDemandModal from './EditDemandModal';
+import ProductAutocomplete from './ProductAutocomplete';
 
 interface DemandsListProps {
   demands: ClientDemand[];
@@ -68,7 +69,6 @@ export default function DemandsList({
     { product_name: '', quantity: 1 }
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [suppressedWarnings, setSuppressedWarnings] = useState<Record<number, boolean>>({});
 
   // Search and Filter State
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
@@ -208,109 +208,60 @@ export default function DemandsList({
             </label>
 
             {items.map((item, idx) => {
-              const matchedProd = masterProducts.find(
-                mp => mp.name.trim().toLowerCase() === item.product_name.trim().toLowerCase()
-              );
-              const hasAvailableStock = matchedProd && matchedProd.available_stock && matchedProd.available_stock > 0;
-              const showWarning = hasAvailableStock && !suppressedWarnings[idx];
-
               return (
-                <div key={idx} className="space-y-2">
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 bg-slate-50 p-3 sm:p-0 rounded-xl border sm:border-0 border-slate-200">
-                    <div className="flex-1 relative">
-                      <input
-                        type="text"
-                        required
-                        list={`master-suggestions-${idx}`}
-                        placeholder="ابحث أو اكتب اسم الكتاب..."
-                        value={item.product_name}
-                        onChange={(e) => {
-                          handleItemChange(idx, 'product_name', e.target.value);
-                          setSuppressedWarnings(prev => ({ ...prev, [idx]: false }));
-                        }}
-                        className="w-full bg-white sm:bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 focus:bg-white focus:outline-none focus:border-slate-800 font-medium min-h-[44px]"
-                      />
-                      <datalist id={`master-suggestions-${idx}`}>
-                        {masterProducts.map(mp => (
-                          <option key={mp.id} value={mp.name}>
-                            {mp.available_stock ? `${mp.name} [متوفر بالمحل: ${mp.available_stock} قطعة]` : mp.name}
-                          </option>
-                        ))}
-                      </datalist>
-                    </div>
-
-                    <div className="flex items-center justify-between sm:justify-start gap-2">
-                      <div className="w-32 flex items-center border border-slate-200 rounded-xl bg-white overflow-hidden shrink-0 min-h-[44px]">
-                        <button
-                          type="button"
-                          onClick={() => handleItemChange(idx, 'quantity', Math.max(1, item.quantity - 1))}
-                          disabled={item.quantity <= 1}
-                          className="px-3 py-2 text-slate-600 hover:bg-slate-100 font-bold min-h-[44px] min-w-[44px] flex items-center justify-center disabled:opacity-40 transition-opacity"
-                        >
-                          <Minus className="w-4 h-4" />
-                        </button>
-                        <input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onKeyDown={(e) => {
-                            if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') {
-                              e.preventDefault();
-                            }
-                          }}
-                          onChange={(e) => handleItemChange(idx, 'quantity', Math.max(1, parseInt(e.target.value) || 1))}
-                          className="w-full text-center text-sm font-black text-slate-900 focus:outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleItemChange(idx, 'quantity', Math.max(1, item.quantity + 1))}
-                          className="px-3 py-2 text-slate-600 hover:bg-slate-100 font-bold min-h-[44px] min-w-[44px] flex items-center justify-center"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      {items.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItemRow(idx)}
-                          className="p-2.5 text-rose-700 hover:bg-rose-50 rounded-xl transition-colors shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center border border-rose-200 sm:border-0 bg-white sm:bg-transparent"
-                          title="حذف السطر"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
+                <div key={idx} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 bg-slate-50 p-3 sm:p-0 rounded-xl border sm:border-0 border-slate-200">
+                  <div className="flex-1 relative">
+                    <ProductAutocomplete
+                      required
+                      value={item.product_name}
+                      onChange={(val) => handleItemChange(idx, 'product_name', val)}
+                      masterProducts={masterProducts}
+                      placeholder="ابحث أو اكتب اسم الكتاب..."
+                    />
                   </div>
 
-                  {showWarning && (
-                    <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-3 text-amber-900 text-xs font-bold space-y-2 animate-in fade-in duration-200">
-                      <div className="flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                        <span>تنبيه: هذا الكتاب متوفر حالياً بالمحل (الكمية المتوفرة بالرفوف: {matchedProd.available_stock} قطعة)</span>
-                      </div>
-                      <div className="flex items-center gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleItemChange(idx, 'product_name', '');
-                          }}
-                          className="bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors min-h-[36px]"
-                        >
-                          تجاوز السلعة (أخذها مباشرة من الرف)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSuppressedWarnings(prev => ({ ...prev, [idx]: true }));
-                          }}
-                          className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors min-h-[36px]"
-                        >
-                          إصرار على الإضافة للخصاص
-                        </button>
-                      </div>
+                  <div className="flex items-center justify-between sm:justify-start gap-2">
+                    <div className="w-32 flex items-center border border-slate-200 rounded-xl bg-white overflow-hidden shrink-0 min-h-[44px]">
+                      <button
+                        type="button"
+                        onClick={() => handleItemChange(idx, 'quantity', Math.max(1, item.quantity - 1))}
+                        disabled={item.quantity <= 1}
+                        className="px-3 py-2 text-slate-600 hover:bg-slate-100 font-bold min-h-[44px] min-w-[44px] flex items-center justify-center disabled:opacity-40 transition-opacity"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                      <input
+                        type="number"
+                        min="1"
+                        value={item.quantity}
+                        onKeyDown={(e) => {
+                          if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') {
+                            e.preventDefault();
+                          }
+                        }}
+                        onChange={(e) => handleItemChange(idx, 'quantity', Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-full text-center text-sm font-black text-slate-900 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleItemChange(idx, 'quantity', Math.max(1, item.quantity + 1))}
+                        className="px-3 py-2 text-slate-600 hover:bg-slate-100 font-bold min-h-[44px] min-w-[44px] flex items-center justify-center"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
                     </div>
-                  )}
+
+                    {items.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveItemRow(idx)}
+                        className="p-2.5 text-rose-700 hover:bg-rose-50 rounded-xl transition-colors shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center border border-rose-200 sm:border-0 bg-white sm:bg-transparent"
+                        title="حذف السطر"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -399,58 +350,59 @@ export default function DemandsList({
                   key={demand.id}
                   className="border border-slate-200 rounded-2xl overflow-hidden hover:border-slate-300 transition-all bg-white"
                 >
-                  <div className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="p-3 sm:p-5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 sm:gap-4">
                     
-                    {/* Client Info */}
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-sm shrink-0">
-                        {demand.client?.name.substring(0, 2)}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-extrabold text-slate-900 text-base">{demand.client?.name}</h3>
-                          <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-md ${
-                            demand.status === 'completed' 
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
-                              : demand.status === 'partial' 
-                              ? 'bg-amber-50 text-amber-700 border border-amber-200' 
-                              : 'bg-rose-50 text-rose-700 border border-rose-200'
-                          }`}>
-                            {demand.status === 'completed' ? 'مكتمل' : demand.status === 'partial' ? 'تسليم جزئي' : 'قيد الانتظار'}
-                          </span>
+                    {/* Header: Client Info + Achievement Counter Aligned */}
+                    <div className="flex items-center justify-between gap-2 w-full md:w-auto">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs sm:text-sm shrink-0">
+                          {demand.client?.name.substring(0, 2)}
                         </div>
-                        <p className="text-xs text-slate-500 font-mono flex items-center gap-2 mt-0.5 dir-ltr text-right">
-                          <span>{demand.client?.phone}</span>
-                          <span>•</span>
-                          <span>{new Date(demand.created_at || Date.now()).toLocaleDateString('ar-MA')}</span>
-                        </p>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h3 className="font-extrabold text-slate-900 text-sm sm:text-base truncate">{demand.client?.name}</h3>
+                            <span className={`text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-md ${
+                              demand.status === 'completed' 
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                                : demand.status === 'partial' 
+                                ? 'bg-amber-50 text-amber-700 border border-amber-200' 
+                                : 'bg-rose-50 text-rose-700 border border-rose-200'
+                            }`}>
+                              {demand.status === 'completed' ? 'مكتمل' : demand.status === 'partial' ? 'تسليم جزئي' : 'قيد الانتظار'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] sm:text-xs text-slate-500 font-mono flex items-center gap-1.5 mt-0.5 dir-ltr text-right">
+                            <span>{demand.client?.phone}</span>
+                            <span>•</span>
+                            <span>{new Date(demand.created_at || Date.now()).toLocaleDateString('ar-MA')}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-center shrink-0">
+                        <span className="text-[9px] sm:text-[10px] text-slate-500 block leading-tight">الإنجاز</span>
+                        <span className="text-xs sm:text-sm font-black text-slate-900">{deliveredItems} / {totalItems}</span>
                       </div>
                     </div>
 
-                    {/* Progress Counter & Action Buttons */}
-                    <div className="flex flex-wrap items-center justify-between md:justify-end w-full md:w-auto gap-2.5 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
+                    {/* Compact Action Buttons Grid for Mobile */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 w-full md:w-auto pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
                       
-                      <div className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-center min-w-[85px]">
-                        <span className="text-[10px] text-slate-500 block">الإنجاز</span>
-                        <span className="text-sm font-black text-slate-900">{deliveredItems} / {totalItems}</span>
-                      </div>
-
-                      {/* Clean Action Buttons (Touch Friendly 44px) */}
-                      <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
+                      <div className="grid grid-cols-2 gap-1.5 w-full sm:flex sm:flex-wrap sm:w-auto">
                         
                         <button
                           onClick={() => setEditingDemand(demand)}
-                          className="bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 text-xs font-bold py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-colors min-h-[44px]"
+                          className="bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 text-[11px] sm:text-xs font-bold py-1.5 px-2 sm:py-2.5 sm:px-3 rounded-xl flex items-center justify-center gap-1 transition-colors min-h-[36px] sm:min-h-[44px]"
                         >
-                          <Edit className="w-4 h-4 text-sky-600 shrink-0" />
+                          <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-600 shrink-0" />
                           <span>تعديل الطلب</span>
                         </button>
 
                         <button
                           onClick={() => setSelectedPrintDemand(demand)}
-                          className="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-slate-200 min-h-[44px]"
+                          className="bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] sm:text-xs font-bold py-1.5 px-2 sm:py-2.5 sm:px-3 rounded-xl flex items-center justify-center gap-1 transition-colors border border-slate-200 min-h-[36px] sm:min-h-[44px]"
                         >
-                          <Printer className="w-4 h-4 text-slate-600 shrink-0" />
+                          <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-600 shrink-0" />
                           <span>طباعة الوصل</span>
                         </button>
 
@@ -458,26 +410,26 @@ export default function DemandsList({
                           href={getWhatsAppLink(demand)}
                           target="_blank"
                           rel="noreferrer"
-                          className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-colors min-h-[44px]"
+                          className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] sm:text-xs font-bold py-1.5 px-2 sm:py-2.5 sm:px-3 rounded-xl flex items-center justify-center gap-1 transition-colors min-h-[36px] sm:min-h-[44px]"
                         >
-                          <MessageSquare className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0" />
                           <span>إشعار واتساب</span>
                         </a>
 
                         <button
                           onClick={() => onDeleteDemand(demand.id)}
-                          className="bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-bold py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 transition-colors min-h-[44px]"
+                          className="bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-[11px] sm:text-xs font-bold py-1.5 px-2 sm:py-2.5 sm:px-3 rounded-xl flex items-center justify-center gap-1 transition-colors min-h-[36px] sm:min-h-[44px]"
                         >
-                          <Trash2 className="w-4 h-4 text-rose-600 shrink-0" />
+                          <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-600 shrink-0" />
                           <span>حذف الطلب</span>
                         </button>
 
                         <button
                           onClick={() => setExpandedDemandId(isExpanded ? null : demand.id)}
-                          className="col-span-2 sm:col-span-1 p-2.5 text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 min-h-[44px] flex items-center justify-center border border-slate-200 sm:border-0"
+                          className="col-span-2 sm:col-span-1 p-1.5 sm:p-2.5 text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 min-h-[36px] sm:min-h-[44px] flex items-center justify-center border border-slate-200 sm:border-0"
                           title="عرض التفاصيل"
                         >
-                          {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                          {isExpanded ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" />}
                         </button>
 
                       </div>

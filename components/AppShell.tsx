@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Sidebar from '@/components/Sidebar';
 import { 
+  getFullStoreData,
   getActiveBatch, 
   archiveActiveBatch, 
   getMasterProducts, 
@@ -10,10 +11,24 @@ import {
   createClientDemand, 
   updateClientDemand,
   updateDemandItemState, 
-  deleteClientDemand 
+  deleteClientDemand,
+  autoAllocateStock
 } from '@/lib/dataStore';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { PurchaseBatch, MasterProduct, ClientDemand } from '@/lib/types';
+
+// Module-level SWR Cache for Instant (<10ms) Tab Navigation
+let globalAppCache: {
+  activeBatch: PurchaseBatch | null;
+  masterProducts: MasterProduct[];
+  demands: ClientDemand[];
+  isInitialized: boolean;
+} = {
+  activeBatch: null,
+  masterProducts: [],
+  demands: [],
+  isInitialized: false,
+};
 
 export interface AppShellData {
   demands: ClientDemand[];
@@ -24,6 +39,7 @@ export interface AppShellData {
   handleCreateDemand: (name: string, phone: string, items: any[]) => Promise<void>;
   handleUpdateDemand: (id: string, name: string, phone: string, items: any[]) => Promise<void>;
   handleUpdateItemState: (id: string, updates: any) => Promise<void>;
+  handleAutoAllocateStock: (productName: string, receivedQty: number) => Promise<{ clientName: string; phone: string; fulfilledQty: number; link: string }[]>;
   handleDeleteDemand: (id: string) => Promise<void>;
   handleArchiveBatch: (name: string) => Promise<void>;
 }
@@ -33,23 +49,29 @@ interface AppShellProps {
 }
 
 export default function AppShell({ children }: AppShellProps) {
-  const [activeBatch, setActiveBatch] = useState<PurchaseBatch | null>(null);
-  const [masterProducts, setMasterProducts] = useState<MasterProduct[]>([]);
-  const [demands, setDemands] = useState<ClientDemand[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [activeBatch, setActiveBatch] = useState<PurchaseBatch | null>(globalAppCache.activeBatch);
+  const [masterProducts, setMasterProducts] = useState<MasterProduct[]>(globalAppCache.masterProducts);
+  const [demands, setDemands] = useState<ClientDemand[]>(globalAppCache.demands);
+  const [isLoading, setIsLoading] = useState<boolean>(!globalAppCache.isInitialized);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (isSilent = globalAppCache.isInitialized) => {
+    if (!isSilent) {
+      setIsLoading(true);
+    }
     try {
-      const batch = await getActiveBatch();
-      setActiveBatch(batch);
+      const fullData = await getFullStoreData(isSilent);
 
-      const [prods, demList] = await Promise.all([
-        getMasterProducts(),
-        getClientDemands(batch.id),
-      ]);
+      setActiveBatch(fullData.activeBatch);
+      setMasterProducts(fullData.masterProducts);
+      setDemands(fullData.demands);
 
-      setMasterProducts(prods);
-      setDemands(demList);
+      // Update global SWR cache
+      globalAppCache = {
+        activeBatch: fullData.activeBatch,
+        masterProducts: fullData.masterProducts,
+        demands: fullData.demands,
+        isInitialized: true,
+      };
     } catch (err) {
       console.error('Error loading data:', err);
     } finally {
@@ -63,17 +85,66 @@ export default function AppShell({ children }: AppShellProps) {
 
   const handleCreateDemand = async (name: string, phone: string, items: any[]) => {
     await createClientDemand(name, phone, items);
-    await loadData();
+    await loadData(true);
   };
 
   const handleUpdateDemand = async (id: string, name: string, phone: string, items: any[]) => {
     await updateClientDemand(id, name, phone, items);
-    await loadData();
+    await loadData(true);
   };
 
   const handleUpdateItemState = async (itemId: string, updates: { is_in_stock?: boolean; is_delivered?: boolean }) => {
+    // Optimistic item update
+    setDemands(prev => {
+      const next = prev.map(dem => ({
+        ...dem,
+        items: dem.items?.map(it => it.id === itemId ? { ...it, ...updates } : it)
+      }));
+      globalAppCache.demands = next;
+      return next;
+    });
+
     await updateDemandItemState(itemId, updates);
-    await loadData();
+    await loadData(true);
+  };
+
+  const handleAutoAllocateStock = async (productName: string, receivedQty: number) => {
+    // OPTIMISTIC LOCAL ALLOCATION UPDATE
+    const cleanName = productName.trim().toLowerCase();
+    let remaining = Math.max(1, Math.floor(receivedQty));
+
+    setDemands(prev => {
+      const sortedDemands = [...prev].sort((a, b) => 
+        new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+      );
+
+      const updated = sortedDemands.map(dem => {
+        if (!dem.items || remaining <= 0) return dem;
+        const newItems = dem.items.map(it => {
+          if (remaining <= 0) return it;
+          if (it.product_name.trim().toLowerCase() === cleanName && !it.is_in_stock && !it.is_delivered) {
+            const needed = it.quantity;
+            if (remaining >= needed) {
+              remaining -= needed;
+              return { ...it, is_in_stock: true };
+            } else {
+              const fulfilled = remaining;
+              remaining = 0;
+              return { ...it, quantity: needed - fulfilled };
+            }
+          }
+          return it;
+        });
+        return { ...dem, items: newItems };
+      });
+
+      globalAppCache.demands = updated;
+      return updated;
+    });
+
+    const res = await autoAllocateStock(productName, receivedQty);
+    await loadData(true);
+    return res;
   };
 
   const handleDeleteDemand = async (id: string) => {
@@ -87,11 +158,11 @@ export default function AppShell({ children }: AppShellProps) {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-slate-50 flex font-cairo dir-rtl overflow-x-hidden">
+    <div className="min-h-[100dvh] bg-slate-50 flex font-cairo dir-rtl overflow-x-hidden" suppressHydrationWarning>
       <Sidebar isSupabaseActive={isSupabaseConfigured} />
 
-      <div className="flex-1 lg:mr-64 flex flex-col min-h-[100dvh] pt-14 lg:pt-0 w-full">
-        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="flex-1 lg:mr-64 flex flex-col min-h-[100dvh] pt-14 lg:pt-0 w-full" suppressHydrationWarning>
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6" suppressHydrationWarning>
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-24 space-y-3">
               <div className="w-10 h-10 border-4 border-slate-800 border-t-transparent rounded-full animate-spin"></div>
@@ -107,6 +178,7 @@ export default function AppShell({ children }: AppShellProps) {
               handleCreateDemand,
               handleUpdateDemand,
               handleUpdateItemState,
+              handleAutoAllocateStock,
               handleDeleteDemand,
               handleArchiveBatch,
             })

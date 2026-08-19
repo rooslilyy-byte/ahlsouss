@@ -37,8 +37,8 @@ export default function ThermalReceipt({ demand, onClose }: ThermalReceiptProps)
     }
   };
 
-  const renderSingleReceiptCopy = (copyType: 'نسخة الزبون' | 'نسخة المكتبة') => (
-    <div className="receipt-single-copy bg-white text-black font-cairo dir-rtl p-1 mb-2">
+  const renderSingleReceiptCopy = () => (
+    <div className="receipt-single-copy bg-white text-black font-cairo dir-rtl p-1">
       {/* Top Center Logo */}
       <div className="text-center mb-2">
         <img 
@@ -55,7 +55,7 @@ export default function ThermalReceipt({ demand, onClose }: ThermalReceiptProps)
         <div className="receipt-divider border-t border-dashed border-black my-1.5"></div>
         
         <div className="inline-block border border-black px-2.5 py-0.5 text-[10px] font-black bg-slate-100 text-black">
-          وصل خصاص — {copyType}
+          وصل خصاص
         </div>
       </div>
 
@@ -129,18 +129,9 @@ export default function ThermalReceipt({ demand, onClose }: ThermalReceiptProps)
     </div>
   );
 
-  const cuttingLine = (
-    <div className="my-3 text-center text-[9px] font-mono border-t-2 border-b-2 border-dashed border-black py-1 bg-white text-black font-extrabold dir-rtl">
-      ✂ - - - - - - - - - - - - - - - - - - - - - - - - ✂
-      <span className="block text-[8.5px] font-extrabold font-cairo mt-0.5">خط القص | Cut Line</span>
-    </div>
-  );
-
   const printableContent = (
     <div id="printable-thermal-receipt" className="print-only">
-      {renderSingleReceiptCopy('نسخة الزبون')}
-      {cuttingLine}
-      {renderSingleReceiptCopy('نسخة المكتبة')}
+      {renderSingleReceiptCopy()}
     </div>
   );
 
@@ -163,7 +154,7 @@ export default function ThermalReceipt({ demand, onClose }: ThermalReceiptProps)
                 className="bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-2 border border-slate-700 shadow"
               >
                 <Printer className="w-4 h-4 text-slate-300" />
-                <span>طباعة الآن (نسختين)</span>
+                <span>طباعة الوصل</span>
               </button>
               <button
                 onClick={onClose}
@@ -177,14 +168,12 @@ export default function ThermalReceipt({ demand, onClose }: ThermalReceiptProps)
           {/* Scrollable Receipt Preview */}
           <div className="overflow-y-auto p-4 flex-1 my-2 bg-slate-800/50 rounded-xl flex flex-col items-center">
             <div className="receipt-preview-container bg-white p-3 rounded-lg shadow max-w-[72mm] w-full text-black">
-              {renderSingleReceiptCopy('نسخة الزبون')}
-              {cuttingLine}
-              {renderSingleReceiptCopy('نسخة المكتبة')}
+              {renderSingleReceiptCopy()}
             </div>
           </div>
 
           <div className="pt-2 text-xs text-slate-400 text-center">
-            المقاس المجهز: 80mm Roll • يطبع تلقائياً نسختين (واحدة للزبون والأخرى للمكتبة).
+            المقاس المجهز: 80mm Roll • وصل واحد جاهز للطباعة
           </div>
         </div>
       </div>

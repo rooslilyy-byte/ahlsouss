@@ -7,12 +7,11 @@ import {
   Clock, 
   AlertCircle, 
   CheckCircle2, 
-  TrendingUp, 
-  Users, 
-  Package, 
   Plus, 
   ArrowLeft,
-  FileText
+  UserPlus,
+  FileSpreadsheet,
+  PackageCheck
 } from 'lucide-react';
 import { ClientDemand, MasterProduct } from '@/lib/types';
 
@@ -24,7 +23,6 @@ interface DashboardOverviewProps {
 
 export default function DashboardOverview({
   demands,
-  masterProducts,
 }: DashboardOverviewProps) {
   const stats = useMemo(() => {
     const totalDemands = demands.length;
@@ -34,22 +32,15 @@ export default function DashboardOverview({
 
     let totalItemsCount = 0;
     let deliveredItemsCount = 0;
-    const bookFrequency: Record<string, number> = {};
 
     for (const d of demands) {
       if (d.items) {
         for (const item of d.items) {
           totalItemsCount += item.quantity;
           if (item.is_delivered) deliveredItemsCount += item.quantity;
-
-          bookFrequency[item.product_name] = (bookFrequency[item.product_name] || 0) + item.quantity;
         }
       }
     }
-
-    const topRequestedBooks = Object.entries(bookFrequency)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
 
     return {
       totalDemands,
@@ -58,7 +49,6 @@ export default function DashboardOverview({
       completedDemands,
       totalItemsCount,
       deliveredItemsCount,
-      topRequestedBooks,
     };
   }, [demands]);
 
@@ -174,89 +164,59 @@ export default function DashboardOverview({
 
       </div>
 
-      {/* 3. Top Requested Books & Quick POS Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* 3. Prominent Quick Action Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
         
-        {/* Top Requested Books */}
-        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3 flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-slate-700" />
-              <h3 className="font-extrabold text-slate-900 text-base">أكثر الكتب والمستلزمات طلباً</h3>
+        {/* Card 1: Add Client & Demand */}
+        <Link
+          href="/demands"
+          className="bg-slate-900 hover:bg-slate-800 text-white border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-md transition-all active:scale-[0.98] flex flex-col justify-between space-y-4 group min-h-[140px] w-full"
+        >
+          <div className="flex items-center justify-between">
+            <div className="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 text-sky-400 flex items-center justify-center font-bold group-hover:scale-105 transition-transform shrink-0">
+              <UserPlus className="w-6 h-6 text-sky-400" />
             </div>
-            
-            {/* Direct A4 Reports Route Link */}
-            <Link
-              href="/reports"
-              className="text-xs font-bold text-slate-700 hover:text-slate-900 flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 px-3.5 py-2 rounded-xl border border-slate-200 transition-colors min-h-[44px]"
-            >
-              <FileText className="w-4 h-4 text-slate-700 shrink-0" />
-              <span>تقرير المشتريات A4</span>
-            </Link>
+            <ArrowLeft className="w-5 h-5 text-slate-400 group-hover:-translate-x-1 transition-transform shrink-0" />
           </div>
-
-          <div className="space-y-3">
-            {stats.topRequestedBooks.length === 0 ? (
-              <p className="text-center py-6 text-xs text-slate-400">لا توجد بيانات كافية للتحليل حالياً</p>
-            ) : (
-              stats.topRequestedBooks.map(([title, qty], idx) => (
-                <div key={idx} className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded-lg bg-slate-900 text-white font-black text-xs flex items-center justify-center">
-                      #{idx + 1}
-                    </span>
-                    <span className="font-bold text-slate-900 text-sm">{title}</span>
-                  </div>
-                  <span className="font-black text-slate-900 text-xs bg-white border border-slate-200 px-3 py-1 rounded-md">
-                    {qty} قطعة مطلوب
-                  </span>
-                </div>
-              ))
-            )}
+          <div>
+            <h3 className="font-black text-white text-base sm:text-lg">إضافة زبون جديد</h3>
+            <p className="text-xs text-slate-400 font-medium mt-1">تسجيل خصاص مدرسي جديد لزبون</p>
           </div>
-        </div>
+        </Link>
 
-        {/* POS Quick Actions */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-          <h3 className="font-extrabold text-slate-900 text-base border-b border-slate-100 pb-3">
-            اختصارات سريعة للبائع
-          </h3>
-
-          <div className="space-y-2.5">
-            <Link
-              href="/demands"
-              className="w-full bg-slate-900 hover:bg-slate-800 text-white p-3.5 rounded-xl font-bold text-xs flex items-center justify-between transition-colors shadow-sm min-h-[44px]"
-            >
-              <span className="flex items-center gap-2">
-                <Plus className="w-4 h-4 text-white" />
-                <span>تسجيل طلب خصاص جديد</span>
-              </span>
-              <ArrowLeft className="w-4 h-4 text-slate-400" />
-            </Link>
-
-            <Link
-              href="/stock"
-              className="w-full bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 p-3.5 rounded-xl font-bold text-xs flex items-center justify-between transition-colors min-h-[44px]"
-            >
-              <span className="flex items-center gap-2">
-                <Package className="w-4 h-4 text-slate-600" />
-                <span>استقبال وتوزيع السلع</span>
-              </span>
-              <ArrowLeft className="w-4 h-4 text-slate-400" />
-            </Link>
-
-            <Link
-              href="/customers"
-              className="w-full bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 p-3.5 rounded-xl font-bold text-xs flex items-center justify-between transition-colors min-h-[44px]"
-            >
-              <span className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-slate-600" />
-                <span>دليل وسجل الزبائن</span>
-              </span>
-              <ArrowLeft className="w-4 h-4 text-slate-400" />
-            </Link>
+        {/* Card 2: A4 Purchase Report */}
+        <Link
+          href="/reports"
+          className="bg-white border-2 border-slate-200 hover:border-slate-900 text-slate-900 rounded-2xl p-5 sm:p-6 shadow-sm transition-all active:scale-[0.98] flex flex-col justify-between space-y-4 group min-h-[140px] w-full"
+        >
+          <div className="flex items-center justify-between">
+            <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-900 flex items-center justify-center font-bold group-hover:scale-105 transition-transform shrink-0">
+              <FileSpreadsheet className="w-6 h-6 text-slate-900" />
+            </div>
+            <ArrowLeft className="w-5 h-5 text-slate-400 group-hover:-translate-x-1 transition-transform shrink-0" />
           </div>
-        </div>
+          <div>
+            <h3 className="font-black text-slate-900 text-base sm:text-lg">تقرير المشتريات A4</h3>
+            <p className="text-xs text-slate-500 font-medium mt-1">طباعة ورقة الخصاص للموردين</p>
+          </div>
+        </Link>
+
+        {/* Card 3: Add & Allocate Stock */}
+        <Link
+          href="/stock"
+          className="bg-white border-2 border-slate-200 hover:border-slate-900 text-slate-900 rounded-2xl p-5 sm:p-6 shadow-sm transition-all active:scale-[0.98] flex flex-col justify-between space-y-4 group min-h-[140px] w-full"
+        >
+          <div className="flex items-center justify-between">
+            <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-900 flex items-center justify-center font-bold group-hover:scale-105 transition-transform shrink-0">
+              <PackageCheck className="w-6 h-6 text-slate-900" />
+            </div>
+            <ArrowLeft className="w-5 h-5 text-slate-400 group-hover:-translate-x-1 transition-transform shrink-0" />
+          </div>
+          <div>
+            <h3 className="font-black text-slate-900 text-base sm:text-lg">استقبال السلع والمخزون</h3>
+            <p className="text-xs text-slate-500 font-medium mt-1">تأكيد وصول الكتب وتوزيعها فوراً</p>
+          </div>
+        </Link>
 
       </div>
 

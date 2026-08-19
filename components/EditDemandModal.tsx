@@ -17,6 +17,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { ClientDemand, MasterProduct } from '@/lib/types';
+import ProductAutocomplete from './ProductAutocomplete';
 
 interface EditDemandModalProps {
   demand: ClientDemand;
@@ -56,7 +57,6 @@ export default function EditDemandModal({
 
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [suppressedWarnings, setSuppressedWarnings] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     if (demand.items) {
@@ -224,37 +224,19 @@ export default function EditDemandModal({
             </div>
 
             {items.map((item, idx) => {
-              const matchedProd = masterProducts.find(
-                mp => mp.name.trim().toLowerCase() === item.product_name.trim().toLowerCase()
-              );
-              const hasAvailableStock = matchedProd && matchedProd.available_stock && matchedProd.available_stock > 0;
-              const showWarning = hasAvailableStock && !suppressedWarnings[idx] && !item.is_in_stock && !item.is_delivered;
-
               return (
                 <div key={idx} className="bg-slate-50 border border-slate-200 p-3 sm:p-4 rounded-xl space-y-3">
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
                     
                     {/* Product Name Autocomplete */}
                     <div className="flex-1 relative">
-                      <input
-                        type="text"
+                      <ProductAutocomplete
                         required
-                        list={`edit-master-suggestions-${idx}`}
-                        placeholder="اسم الكتاب أو المستلزم..."
                         value={item.product_name}
-                        onChange={(e) => {
-                          handleItemChange(idx, 'product_name', e.target.value);
-                          setSuppressedWarnings(prev => ({ ...prev, [idx]: false }));
-                        }}
-                        className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-slate-800 font-medium min-h-[44px]"
+                        onChange={(val) => handleItemChange(idx, 'product_name', val)}
+                        masterProducts={masterProducts}
+                        placeholder="اسم الكتاب أو المستلزم..."
                       />
-                      <datalist id={`edit-master-suggestions-${idx}`}>
-                        {masterProducts.map(mp => (
-                          <option key={mp.id} value={mp.name}>
-                            {mp.available_stock ? `${mp.name} [متوفر بالمحل: ${mp.available_stock} قطعة]` : mp.name}
-                          </option>
-                        ))}
-                      </datalist>
                     </div>
 
                     <div className="flex items-center justify-between sm:justify-start gap-2">
@@ -300,35 +282,6 @@ export default function EditDemandModal({
                       </button>
                     </div>
                   </div>
-
-                  {showWarning && (
-                    <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 text-amber-900 text-xs font-bold space-y-2 animate-in fade-in duration-200">
-                      <div className="flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                        <span>تنبيه: هذا الكتاب متوفر حالياً بالمحل (الكمية المتوفرة بالرفوف: {matchedProd.available_stock} قطعة)</span>
-                      </div>
-                      <div className="flex items-center gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleItemChange(idx, 'product_name', '');
-                          }}
-                          className="bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors min-h-[36px]"
-                        >
-                          تجاوز السلعة (أخذها مباشرة من الرف)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSuppressedWarnings(prev => ({ ...prev, [idx]: true }));
-                          }}
-                          className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors min-h-[36px]"
-                        >
-                          إصرار على الإضافة للخصاص
-                        </button>
-                      </div>
-                    </div>
-                  )}
 
                   {/* State Toggles (In Stock / Delivered) */}
                   <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-slate-200/60 text-xs font-semibold">

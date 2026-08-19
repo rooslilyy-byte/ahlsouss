@@ -222,6 +222,117 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
 
+    // --- AUTO ALLOCATE STOCK (FIFO Multi-Client) ---
+    if (action === 'auto_allocate_stock') {
+      const { productName, receivedQty } = body;
+      const cleanName = productName.trim();
+      let remainingQty = Math.max(1, parseInt(receivedQty) || 1);
+
+      // Get active batch ID
+      const batchRows = await query<PurchaseBatch>(
+        `SELECT id FROM public.purchase_batches WHERE is_archived = false ORDER BY created_at DESC LIMIT 1;`
+      );
+      const batchId = batchRows[0]?.id;
+
+      // Select matching pending demand_items in active batch ordered by client_demands.created_at ASC
+      const pendingItems = await query<any>(
+        `SELECT 
+          di.id AS item_id,
+          di.demand_id,
+          di.product_name,
+          di.quantity,
+          di.is_in_stock,
+          di.is_delivered,
+          cd.created_at AS demand_created_at,
+          c.name AS client_name,
+          c.phone AS client_phone
+         FROM public.demand_items di
+         JOIN public.client_demands cd ON di.demand_id = cd.id
+         JOIN public.clients c ON cd.client_id = c.id
+         WHERE LOWER(TRIM(di.product_name)) = LOWER($1)
+           AND di.is_in_stock = false
+           AND di.is_delivered = false
+           ${batchId ? `AND cd.batch_id = '${batchId}'` : ''}
+         ORDER BY cd.created_at ASC;`,
+        [cleanName]
+      );
+
+      const allocatedClientsMap: Record<string, { clientName: string; phone: string; totalFulfilled: number }> = {};
+
+      for (const item of pendingItems) {
+        if (remainingQty <= 0) break;
+
+        const needed = item.quantity;
+        if (remainingQty >= needed) {
+          await query(
+            `UPDATE public.demand_items SET is_in_stock = true WHERE id = $1;`,
+            [item.item_id]
+          );
+          remainingQty -= needed;
+
+          const key = item.client_phone;
+          if (!allocatedClientsMap[key]) {
+            allocatedClientsMap[key] = {
+              clientName: item.client_name,
+              phone: item.client_phone,
+              totalFulfilled: 0,
+            };
+          }
+          allocatedClientsMap[key].totalFulfilled += needed;
+        } else {
+          const fulfilledPortion = remainingQty;
+          const remainingMissingPortion = needed - fulfilledPortion;
+
+          await query(
+            `UPDATE public.demand_items SET quantity = $1, is_in_stock = false WHERE id = $2;`,
+            [remainingMissingPortion, item.item_id]
+          );
+
+          await query(
+            `INSERT INTO public.demand_items (demand_id, product_name, quantity, is_in_stock, is_delivered)
+             VALUES ($1, $2, $3, true, false);`,
+            [item.demand_id, item.product_name, fulfilledPortion]
+          );
+
+          remainingQty = 0;
+
+          const key = item.client_phone;
+          if (!allocatedClientsMap[key]) {
+            allocatedClientsMap[key] = {
+              clientName: item.client_name,
+              phone: item.client_phone,
+              totalFulfilled: 0,
+            };
+          }
+          allocatedClientsMap[key].totalFulfilled += fulfilledPortion;
+        }
+      }
+
+      if (remainingQty > 0) {
+        await query(
+          `INSERT INTO public.master_products (name, category, available_stock)
+           VALUES ($1, 'كتاب مدرسي', $2)
+           ON CONFLICT (name) DO UPDATE 
+           SET available_stock = GREATEST(0, COALESCE(master_products.available_stock, 0) + EXCLUDED.available_stock);`,
+          [cleanName, remainingQty]
+        );
+      }
+
+      const allocatedClients = Object.values(allocatedClientsMap).map(c => {
+        let rawPhone = c.phone.replace(/\D/g, '');
+        if (rawPhone.startsWith('0')) rawPhone = '212' + rawPhone.slice(1);
+        const message = `السلام عليكم ورحمة الله وبركاته السيد(ة) ${c.clientName}،\n\nنخبركم من مكتبة وراقة اهل سوس أن كتاب / مستلزم: "${cleanName}" (عدد: ${c.totalFulfilled}) الذي طلبتموه قد وصل للمحل وهو جاهز للتسليم!\n\nالمكان: مكتبة وراقة اهل سوس\nالهاتف: 0675502660`;
+        return {
+          clientName: c.clientName,
+          phone: c.phone,
+          fulfilledQty: c.totalFulfilled,
+          link: `https://wa.me/${rawPhone}?text=${encodeURIComponent(message)}`,
+        };
+      });
+
+      return NextResponse.json({ success: true, allocatedClients, surplusQty: remainingQty });
+    }
+
     // --- DELETE DEMAND ---
     if (action === 'delete_demand') {
       const { demandId } = body;

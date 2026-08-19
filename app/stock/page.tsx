@@ -7,11 +7,12 @@ import StockAllocation from '@/components/StockAllocation';
 export default function StockPage() {
   return (
     <AppShell>
-      {({ demands, masterProducts, handleUpdateItemState }) => (
+      {({ demands, masterProducts, handleUpdateItemState, handleAutoAllocateStock }) => (
         <StockAllocation
           demands={demands}
           masterProducts={masterProducts}
           onUpdateItemState={handleUpdateItemState}
+          onAutoAllocateStock={handleAutoAllocateStock}
         />
       )}
     </AppShell>
