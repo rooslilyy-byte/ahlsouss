@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useRef } from 'react';
+import Link from 'next/link';
 import { 
   Plus, 
   Trash2, 
@@ -279,9 +280,9 @@ export default function DemandsList({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold px-6 py-2.5 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all disabled:opacity-50 min-h-[44px]"
+                className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold px-6 py-2.5 rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 min-h-[44px]"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-4 h-4 text-white" />
                 <span>طلب خصاص جديد</span>
               </button>
             </div>
@@ -290,10 +291,11 @@ export default function DemandsList({
         </form>
       </div>
 
-      {/* 2. Demands List & Search Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm space-y-4">
+      {/* 2. Demands List & Search Compact Table */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden space-y-0">
         
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        {/* Filter & Search Top Bar */}
+        <div className="p-4 sm:p-5 border-b border-slate-200/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-slate-50/50">
           <div className="relative w-full md:w-80">
             <Search className="w-4 h-4 text-slate-400 absolute right-3.5 top-3" />
             <input
@@ -301,204 +303,190 @@ export default function DemandsList({
               placeholder="ابحث باسم الزبون، الهاتف، أو الكتاب..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl pr-10 pl-4 py-2 text-sm text-slate-900 focus:bg-white focus:outline-none focus:border-slate-800 font-medium"
+              className="w-full bg-white border border-slate-200 rounded-xl pr-10 pl-4 py-2 text-sm text-slate-900 focus:outline-none focus:border-slate-800 font-medium min-h-[40px]"
             />
           </div>
 
-          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl overflow-x-auto text-xs font-bold">
+          <div className="flex items-center gap-1 bg-slate-200/60 p-1 rounded-xl overflow-x-auto text-xs font-bold shrink-0">
             <button
               onClick={() => setStatusFilter('all')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${statusFilter === 'all' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'}`}
+              className={`px-3 py-1.5 rounded-lg transition-all ${statusFilter === 'all' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
             >
               الكل ({stats.total})
             </button>
             <button
               onClick={() => setStatusFilter('pending')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${statusFilter === 'pending' ? 'bg-white text-rose-700 shadow-sm' : 'text-slate-600'}`}
+              className={`px-3 py-1.5 rounded-lg transition-all ${statusFilter === 'pending' ? 'bg-white text-rose-700 shadow-sm' : 'text-slate-600 hover:text-rose-700'}`}
             >
               معلق ({stats.pending})
             </button>
             <button
               onClick={() => setStatusFilter('partial')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${statusFilter === 'partial' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-600'}`}
+              className={`px-3 py-1.5 rounded-lg transition-all ${statusFilter === 'partial' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-600 hover:text-amber-700'}`}
             >
               جزئي ({stats.partial})
             </button>
             <button
               onClick={() => setStatusFilter('completed')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${statusFilter === 'completed' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600'}`}
+              className={`px-3 py-1.5 rounded-lg transition-all ${statusFilter === 'completed' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-emerald-700'}`}
             >
               مكتمل ({stats.completed})
             </button>
           </div>
         </div>
 
+        {/* Compact Full-Width Table */}
         {filteredDemands.length === 0 ? (
-          <div className="text-center py-10 border-2 border-dashed border-slate-200 rounded-2xl">
+          <div className="text-center py-12 px-4 border-b border-slate-200">
             <BookOpen className="w-8 h-8 text-slate-300 mx-auto mb-2" />
             <p className="text-xs sm:text-sm font-bold text-slate-600">لا توجد طلبات مطابقة للبحث</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {filteredDemands.map((demand) => {
+          <div className="divide-y divide-slate-200/80">
+            
+            {/* Desktop Column Header Header Bar */}
+            <div className="hidden md:flex items-center justify-between px-6 py-2.5 bg-slate-100/80 border-b border-slate-200 text-[11px] font-black text-slate-500 uppercase tracking-wider">
+              <div className="flex items-center gap-3 min-w-[220px]">
+                <span className="w-7 text-center">#</span>
+                <span>الزبون والترقيم</span>
+              </div>
+              <div className="w-44 text-right">رقم الهاتف (الواتساب)</div>
+              <div className="flex-1 text-center">الخصاص والسلع المطلوبة</div>
+              <div className="w-28 text-left">التفاصيل والخيارات</div>
+            </div>
+
+            {/* Compact Rows */}
+            {filteredDemands.map((demand, idx) => {
               const totalItems = demand.items?.length || 0;
-              const deliveredItems = demand.items?.filter(i => i.is_delivered).length || 0;
+              const missingItems = demand.items?.filter(i => !i.is_in_stock && !i.is_delivered) || [];
+              const missingCount = missingItems.length;
+
               const isExpanded = expandedDemandId === demand.id;
 
               return (
-                <div 
-                  key={demand.id}
-                  className="border border-slate-200 rounded-2xl overflow-hidden hover:border-slate-300 transition-all bg-white"
-                >
-                  <div className="p-3 sm:p-5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 sm:gap-4">
+                <div key={demand.id} className="group transition-colors bg-white hover:bg-slate-50/80">
+                  
+                  {/* Main Minimalist Compact Row */}
+                  <div 
+                    onClick={() => setExpandedDemandId(isExpanded ? null : demand.id)}
+                    className="py-2.5 px-3 sm:py-3 sm:px-5 cursor-pointer flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 text-right select-none"
+                  >
                     
-                    {/* Header: Client Info + Achievement Counter Aligned */}
-                    <div className="flex items-center justify-between gap-2 w-full md:w-auto">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs sm:text-sm shrink-0">
-                          {demand.client?.name.substring(0, 2)}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <h3 className="font-extrabold text-slate-900 text-sm sm:text-base truncate">{demand.client?.name}</h3>
-                            <span className={`text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-md ${
-                              demand.status === 'completed' 
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
-                                : demand.status === 'partial' 
-                                ? 'bg-amber-50 text-amber-700 border border-amber-200' 
-                                : 'bg-rose-50 text-rose-700 border border-rose-200'
-                            }`}>
-                              {demand.status === 'completed' ? 'مكتمل' : demand.status === 'partial' ? 'تسليم جزئي' : 'قيد الانتظار'}
-                            </span>
-                          </div>
-                          <p className="text-[11px] sm:text-xs text-slate-500 font-mono flex items-center gap-1.5 mt-0.5 dir-ltr text-right">
-                            <span>{demand.client?.phone}</span>
-                            <span>•</span>
-                            <span>{new Date(demand.created_at || Date.now()).toLocaleDateString('ar-MA')}</span>
-                          </p>
-                        </div>
+                    {/* RTL Section 1: ID + Customer Name + Phone */}
+                    <div className="flex items-center justify-between md:justify-start gap-2.5 min-w-[220px]">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-6 h-6 rounded-md bg-slate-100 text-slate-700 font-extrabold text-[11px] flex items-center justify-center shrink-0 border border-slate-200">
+                          #{idx + 1}
+                        </span>
+                        
+                        <Link
+                          href={`/customers/${encodeURIComponent(demand.id)}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="font-extrabold text-slate-900 text-xs sm:text-sm hover:text-sky-700 hover:underline transition-colors truncate dir-rtl text-right"
+                          title="انقر لعرض الملف الشخصي الكامل للزبون"
+                        >
+                          {demand.client?.name || 'زبون غير معرف'}
+                        </Link>
                       </div>
 
-                      <div className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-center shrink-0">
-                        <span className="text-[9px] sm:text-[10px] text-slate-500 block leading-tight">الإنجاز</span>
-                        <span className="text-xs sm:text-sm font-black text-slate-900">{deliveredItems} / {totalItems}</span>
+                      {/* Mobile Expand Toggle */}
+                      <div className="md:hidden flex items-center gap-1.5">
+                        <button 
+                          type="button"
+                          className="p-1 rounded-lg text-slate-400"
+                        >
+                          {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-800" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                        </button>
                       </div>
                     </div>
 
-                    {/* Compact Action Buttons Grid for Mobile */}
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 w-full md:w-auto pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
-                      
-                      <div className="grid grid-cols-2 gap-1.5 w-full sm:flex sm:flex-wrap sm:w-auto">
-                        
-                        <button
-                          onClick={() => setEditingDemand(demand)}
-                          className="bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 text-[11px] sm:text-xs font-bold py-1.5 px-2 sm:py-2.5 sm:px-3 rounded-xl flex items-center justify-center gap-1 transition-colors min-h-[36px] sm:min-h-[44px]"
-                        >
-                          <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-600 shrink-0" />
-                          <span>تعديل الطلب</span>
-                        </button>
+                    {/* RTL Section 2: Phone Link */}
+                    <div className="w-full md:w-40 flex items-center justify-between md:justify-start gap-2">
+                      <a 
+                        href={`tel:${demand.client?.phone}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-bold font-mono text-slate-700 hover:text-slate-900 bg-slate-100/90 hover:bg-slate-200/90 px-2 py-0.5 rounded border border-slate-200 transition-colors dir-ltr"
+                      >
+                        <Phone className="w-3 h-3 text-slate-500" />
+                        <span>{demand.client?.phone}</span>
+                      </a>
 
-                        <button
-                          onClick={() => setSelectedPrintDemand(demand)}
-                          className="bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] sm:text-xs font-bold py-1.5 px-2 sm:py-2.5 sm:px-3 rounded-xl flex items-center justify-center gap-1 transition-colors border border-slate-200 min-h-[36px] sm:min-h-[44px]"
-                        >
-                          <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-600 shrink-0" />
-                          <span>طباعة الوصل</span>
-                        </button>
-
-                        <a
-                          href={getWhatsAppLink(demand)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] sm:text-xs font-bold py-1.5 px-2 sm:py-2.5 sm:px-3 rounded-xl flex items-center justify-center gap-1 transition-colors min-h-[36px] sm:min-h-[44px]"
-                        >
-                          <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0" />
-                          <span>إشعار واتساب</span>
-                        </a>
-
-                        <button
-                          onClick={() => onDeleteDemand(demand.id)}
-                          className="bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-[11px] sm:text-xs font-bold py-1.5 px-2 sm:py-2.5 sm:px-3 rounded-xl flex items-center justify-center gap-1 transition-colors min-h-[36px] sm:min-h-[44px]"
-                        >
-                          <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-600 shrink-0" />
-                          <span>حذف الطلب</span>
-                        </button>
-
-                        <button
-                          onClick={() => setExpandedDemandId(isExpanded ? null : demand.id)}
-                          className="col-span-2 sm:col-span-1 p-1.5 sm:p-2.5 text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 min-h-[36px] sm:min-h-[44px] flex items-center justify-center border border-slate-200 sm:border-0"
-                          title="عرض التفاصيل"
-                        >
-                          {isExpanded ? <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5" /> : <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" />}
-                        </button>
-
+                      {/* Mobile Badges */}
+                      <div className="md:hidden flex items-center gap-1.5 flex-wrap">
+                        <span className="bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black px-2 py-0.5 rounded">
+                          {totalItems} سلعة
+                        </span>
+                        {missingCount > 0 ? (
+                          <span className="bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-black px-2 py-0.5 rounded">
+                            {missingCount} خصاص
+                          </span>
+                        ) : (
+                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black px-2 py-0.5 rounded">
+                            جاهز
+                          </span>
+                        )}
                       </div>
+                    </div>
 
+                    {/* RTL Section 3: Badges (Desktop) */}
+                    <div className="hidden md:flex flex-1 items-center justify-center gap-2">
+                      <span className="bg-amber-50 text-amber-800 border border-amber-200 text-xs font-black px-2.5 py-0.5 rounded-md">
+                        {totalItems} سلعة
+                      </span>
+                      
+                      {missingCount > 0 ? (
+                        <span className="bg-rose-50 text-rose-700 border border-rose-200 text-xs font-black px-2.5 py-0.5 rounded-md">
+                          {missingCount} خصاص
+                        </span>
+                      ) : (
+                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-black px-2.5 py-0.5 rounded-md">
+                          جاهز بالكامل
+                        </span>
+                      )}
+                    </div>
+
+                    {/* RTL Section 4: Desktop Chevron */}
+                    <div className="hidden md:flex w-16 items-center justify-end">
+                      <div className="w-6 h-6 rounded bg-slate-100 group-hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors">
+                        {isExpanded ? (
+                          <ChevronUp className="w-3.5 h-3.5 text-slate-900" />
+                        ) : (
+                          <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+                        )}
+                      </div>
                     </div>
 
                   </div>
 
-                  {/* Expanded Items */}
+                  {/* Pure Minimalist Inline Missing Items List */}
                   {isExpanded && (
-                    <div className="bg-slate-50/80 border-t border-slate-100 p-3.5 sm:p-4 space-y-3">
-                      <div className="flex items-center justify-between flex-wrap gap-2 pb-1 border-b border-slate-200/60">
-                        <h4 className="text-xs font-bold text-slate-700">تفاصيل الكتب والمستلزمات المطلوبة:</h4>
-                        <button
-                          onClick={() => setEditingDemand(demand)}
-                          className="text-sky-700 hover:text-sky-900 text-xs font-bold flex items-center gap-1.5 bg-sky-50 px-3 py-1.5 rounded-lg border border-sky-200 min-h-[36px]"
-                        >
-                          <Edit className="w-3.5 h-3.5 text-sky-600" />
-                          <span>تعديل هذه الطلبية</span>
-                        </button>
-                      </div>
-
-                      <div className="space-y-2">
-                        {demand.items?.map((item) => (
-                          <div 
-                            key={item.id}
-                            className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs"
-                          >
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-bold text-slate-900 text-sm sm:text-xs">{item.product_name}</span>
-                              <span className="bg-slate-100 font-bold px-2.5 py-1 rounded-md text-slate-700 text-xs sm:text-[11px]">
-                                العدد: {item.quantity}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-2 w-full sm:w-auto">
-                              <button
-                                onClick={() => onUpdateItemState(item.id, { is_in_stock: !item.is_in_stock })}
-                                className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs min-h-[44px] ${
-                                  item.is_in_stock 
-                                    ? 'bg-amber-50 text-amber-800 border border-amber-200' 
-                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200'
-                                }`}
-                              >
-                                {item.is_in_stock ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-                                <span>{item.is_in_stock ? 'متوفر بالمحل' : 'غير متوفر'}</span>
-                              </button>
-
-                              <button
-                                onClick={() => onUpdateItemState(item.id, { is_delivered: !item.is_delivered })}
-                                className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs min-h-[44px] ${
-                                  item.is_delivered 
-                                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
-                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200'
-                                }`}
-                              >
-                                {item.is_delivered ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-                                <span>{item.is_delivered ? 'تم التسليم' : 'لم يسلم'}</span>
-                              </button>
-                            </div>
+                    <div className="bg-slate-50/90 border-t border-slate-200 px-4 py-2.5 space-y-1.5 animate-in fade-in duration-150 text-right">
+                      {missingItems.length === 0 ? (
+                        <div className="text-[11px] font-bold text-emerald-700 py-1">
+                          جميع طلبات هذا الزبون متوفرة بالمحل أو تم تسليمها بالكامل.
+                        </div>
+                      ) : (
+                        missingItems.map((item) => (
+                          <div key={item.id} className="flex items-center gap-2.5 py-1 border-b border-slate-200/50 last:border-0 text-xs">
+                            <span className="w-6 h-6 rounded bg-slate-200/80 text-slate-800 font-black text-xs flex items-center justify-center shrink-0">
+                              {item.quantity}
+                            </span>
+                            <span className="bg-rose-100 text-rose-800 text-[10px] font-black px-2 py-0.5 rounded shrink-0 border border-rose-200">
+                              خصاص
+                            </span>
+                            <span className="font-extrabold text-slate-900 text-xs truncate">
+                              {item.product_name}
+                            </span>
                           </div>
-                        ))}
-                      </div>
+                        ))
+                      )}
                     </div>
                   )}
 
                 </div>
               );
             })}
+
           </div>
         )}
 

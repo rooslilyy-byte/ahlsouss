@@ -123,20 +123,41 @@ export async function POST(request: Request) {
       );
       const demandId = demandRows[0].id;
 
-      // 4. Insert demand items in public.demand_items & auto-upsert master products
+      // 4. Insert demand items in public.demand_items with auto-fulfillment if available_stock >= requested_quantity
       for (const it of items) {
         const prodName = it.product_name.trim();
         const qty = Math.max(1, Math.floor(it.quantity || 1));
 
+        // Ensure master product exists
         await query(
           `INSERT INTO public.master_products (name, category) VALUES ($1, 'كتاب مدرسي') ON CONFLICT (name) DO NOTHING;`,
           [prodName]
         );
 
+        // Pre-check available stock for this product
+        const prodRows = await query<MasterProduct>(
+          `SELECT available_stock FROM public.master_products WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) LIMIT 1;`,
+          [prodName]
+        );
+
+        const currentAvailable = prodRows[0]?.available_stock || 0;
+        let isInStock = false;
+
+        if (currentAvailable >= qty) {
+          isInStock = true;
+          // Deduct allocated stock from master_products
+          await query(
+            `UPDATE public.master_products 
+             SET available_stock = available_stock - $1 
+             WHERE LOWER(TRIM(name)) = LOWER(TRIM($2));`,
+            [qty, prodName]
+          );
+        }
+
         await query(
           `INSERT INTO public.demand_items (demand_id, product_name, quantity, is_in_stock, is_delivered)
-           VALUES ($1, $2, $3, false, false);`,
-          [demandId, prodName, qty]
+           VALUES ($1, $2, $3, $4, false);`,
+          [demandId, prodName, qty, isInStock]
         );
       }
 
@@ -263,49 +284,26 @@ export async function POST(request: Request) {
         if (remainingQty <= 0) break;
 
         const needed = item.quantity;
-        if (remainingQty >= needed) {
-          await query(
-            `UPDATE public.demand_items SET is_in_stock = true WHERE id = $1;`,
-            [item.item_id]
-          );
-          remainingQty -= needed;
+        const fulfilledPortion = Math.min(remainingQty, needed);
 
-          const key = item.client_phone;
-          if (!allocatedClientsMap[key]) {
-            allocatedClientsMap[key] = {
-              clientName: item.client_name,
-              phone: item.client_phone,
-              totalFulfilled: 0,
-            };
-          }
-          allocatedClientsMap[key].totalFulfilled += needed;
-        } else {
-          const fulfilledPortion = remainingQty;
-          const remainingMissingPortion = needed - fulfilledPortion;
+        // Strict Requirement: NEVER execute INSERT into demand_items.
+        // Update the is_in_stock boolean column on existing record.
+        await query(
+          `UPDATE public.demand_items SET is_in_stock = true WHERE id = $1;`,
+          [item.item_id]
+        );
 
-          await query(
-            `UPDATE public.demand_items SET quantity = $1, is_in_stock = false WHERE id = $2;`,
-            [remainingMissingPortion, item.item_id]
-          );
+        remainingQty -= needed;
 
-          await query(
-            `INSERT INTO public.demand_items (demand_id, product_name, quantity, is_in_stock, is_delivered)
-             VALUES ($1, $2, $3, true, false);`,
-            [item.demand_id, item.product_name, fulfilledPortion]
-          );
-
-          remainingQty = 0;
-
-          const key = item.client_phone;
-          if (!allocatedClientsMap[key]) {
-            allocatedClientsMap[key] = {
-              clientName: item.client_name,
-              phone: item.client_phone,
-              totalFulfilled: 0,
-            };
-          }
-          allocatedClientsMap[key].totalFulfilled += fulfilledPortion;
+        const key = item.client_phone;
+        if (!allocatedClientsMap[key]) {
+          allocatedClientsMap[key] = {
+            clientName: item.client_name,
+            phone: item.client_phone,
+            totalFulfilled: 0,
+          };
         }
+        allocatedClientsMap[key].totalFulfilled += fulfilledPortion;
       }
 
       if (remainingQty > 0) {
@@ -337,6 +335,16 @@ export async function POST(request: Request) {
     if (action === 'delete_demand') {
       const { demandId } = body;
       await query(`DELETE FROM public.client_demands WHERE id = $1;`, [demandId]);
+      return NextResponse.json({ success: true });
+    }
+
+    // --- DELETE BULK CUSTOMERS ---
+    if (action === 'delete_bulk_customers') {
+      const { clientIds } = body;
+      if (Array.isArray(clientIds) && clientIds.length > 0) {
+        await query(`DELETE FROM public.client_demands WHERE client_id = ANY($1);`, [clientIds]);
+        await query(`DELETE FROM public.clients WHERE id = ANY($1);`, [clientIds]);
+      }
       return NextResponse.json({ success: true });
     }
 

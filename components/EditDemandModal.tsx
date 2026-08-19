@@ -77,6 +77,16 @@ export default function EditDemandModal({
     field: 'product_name' | 'quantity' | 'is_in_stock' | 'is_delivered',
     value: any
   ) => {
+    if (field === 'product_name' && typeof value === 'string' && value.trim()) {
+      const trimmedLower = value.trim().toLowerCase();
+      const isDuplicate = items.some(
+        (it, idx) => idx !== index && it.product_name.trim().toLowerCase() === trimmedLower
+      );
+      if (isDuplicate) {
+        setErrorMessage(`الكتاب "${value.trim()}" مختار بالفعل في سطر آخر. يرجى زيادة العدد (+/-) في السطر الحالي.`);
+        return;
+      }
+    }
     const newItems = [...items];
     const updated = { ...newItems[index], [field]: value };
 
@@ -118,7 +128,36 @@ export default function EditDemandModal({
     e.preventDefault();
     setErrorMessage('');
 
-    const validItems = items.filter(i => i.product_name.trim().length > 0);
+    // Pre-submit validation check for duplicates
+    const nameCounts: Record<string, number> = {};
+    for (const item of items) {
+      const name = item.product_name.trim().toLowerCase();
+      if (!name) continue;
+      nameCounts[name] = (nameCounts[name] || 0) + 1;
+    }
+
+    const duplicateNames = Object.keys(nameCounts).filter(name => nameCounts[name] > 1);
+    if (duplicateNames.length > 0) {
+      const rawDupName = items.find(i => i.product_name.trim().toLowerCase() === duplicateNames[0])?.product_name || duplicateNames[0];
+      setErrorMessage(`الكتاب "${rawDupName}" مكرر في عدة أسطر. يرجى تعديل العدد (+/-) في السطر الحالي بدلاً من إضافة سطر مكرر.`);
+      return;
+    }
+
+    // Deduplicate items: combine quantities for identical product titles
+    const itemMap: Record<string, typeof items[0]> = {};
+    for (const item of items) {
+      const name = item.product_name.trim();
+      if (!name) continue;
+      const qty = Math.max(1, Number(item.quantity) || 1);
+      if (!itemMap[name]) {
+        itemMap[name] = { ...item, product_name: name, quantity: qty };
+      } else {
+        itemMap[name].quantity += qty;
+        itemMap[name].is_in_stock = itemMap[name].is_in_stock || item.is_in_stock;
+        itemMap[name].is_delivered = itemMap[name].is_delivered || item.is_delivered;
+      }
+    }
+    const validItems = Object.values(itemMap);
 
     if (!clientName.trim() || !clientPhone.trim()) {
       setErrorMessage('يرجى ملء اسم الزبون ورقم الهاتف');
@@ -148,34 +187,31 @@ export default function EditDemandModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 overflow-y-auto no-print">
-      <div className="bg-white border border-slate-200 text-slate-900 rounded-t-3xl sm:rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-200 flex flex-col max-h-[92dvh] sm:max-h-[90vh]">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4 font-cairo dir-rtl">
+      <div className="bg-white border border-slate-200 text-slate-900 rounded-2xl max-w-xl w-full shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[92dvh] sm:max-h-[90vh]">
         
         {/* Header */}
-        <div className="bg-slate-900 text-white p-4 sm:p-5 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-sky-400 shrink-0">
-              <Edit3 className="w-5 h-5" />
+        <div className="bg-slate-900 text-white p-3.5 sm:p-4 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-sky-400 shrink-0">
+              <Edit3 className="w-4 h-4" />
             </div>
-            <div>
-              <h3 className="font-extrabold text-base sm:text-lg">تعديل طلب الزبون</h3>
-              <p className="text-xs text-slate-400">تحديث المعلومات الشخصية والكتب والخصاصات المطلوبة</p>
-            </div>
+            <h3 className="font-bold text-sm sm:text-base">تعديل الطلب</h3>
           </div>
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Scrollable Form Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 space-y-4">
           
           {errorMessage && (
-            <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3.5 rounded-xl text-xs font-bold">
+            <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3 rounded-lg text-xs font-bold">
               {errorMessage}
             </div>
           )}
@@ -224,6 +260,15 @@ export default function EditDemandModal({
             </div>
 
             {items.map((item, idx) => {
+              const selectedOtherNames = items
+                .filter((_, i) => i !== idx)
+                .map(it => it.product_name.trim().toLowerCase())
+                .filter(Boolean);
+
+              const availableProducts = masterProducts.filter(
+                p => !selectedOtherNames.includes(p.name.trim().toLowerCase())
+              );
+
               return (
                 <div key={idx} className="bg-slate-50 border border-slate-200 p-3 sm:p-4 rounded-xl space-y-3">
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
@@ -234,7 +279,7 @@ export default function EditDemandModal({
                         required
                         value={item.product_name}
                         onChange={(val) => handleItemChange(idx, 'product_name', val)}
-                        masterProducts={masterProducts}
+                        masterProducts={availableProducts}
                         placeholder="اسم الكتاب أو المستلزم..."
                       />
                     </div>

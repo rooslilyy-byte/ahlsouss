@@ -97,7 +97,7 @@ export default function ThermalReceiptModal({ demand, onClose }: ThermalReceiptM
               <td className="py-1 px-0.5 text-center font-black">{item.quantity}</td>
               <td className="py-1 px-0.5 text-center">
                 {item.is_delivered ? (
-                  <span className="font-extrabold text-black">✓ مسلَم</span>
+                  <span className="font-extrabold text-black">مسلَم</span>
                 ) : item.is_in_stock ? (
                   <span className="font-bold text-black">بالمتجر</span>
                 ) : (

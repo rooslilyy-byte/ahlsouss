@@ -12,6 +12,7 @@ import {
   updateClientDemand,
   updateDemandItemState, 
   deleteClientDemand,
+  deleteBulkCustomers,
   autoAllocateStock
 } from '@/lib/dataStore';
 import { isSupabaseConfigured } from '@/lib/supabase';
@@ -41,6 +42,7 @@ export interface AppShellData {
   handleUpdateItemState: (id: string, updates: any) => Promise<void>;
   handleAutoAllocateStock: (productName: string, receivedQty: number) => Promise<{ clientName: string; phone: string; fulfilledQty: number; link: string }[]>;
   handleDeleteDemand: (id: string) => Promise<void>;
+  handleDeleteBulkCustomers: (clientIds: string[]) => Promise<void>;
   handleArchiveBatch: (name: string) => Promise<void>;
 }
 
@@ -124,14 +126,8 @@ export default function AppShell({ children }: AppShellProps) {
           if (remaining <= 0) return it;
           if (it.product_name.trim().toLowerCase() === cleanName && !it.is_in_stock && !it.is_delivered) {
             const needed = it.quantity;
-            if (remaining >= needed) {
-              remaining -= needed;
-              return { ...it, is_in_stock: true };
-            } else {
-              const fulfilled = remaining;
-              remaining = 0;
-              return { ...it, quantity: needed - fulfilled };
-            }
+            remaining -= needed;
+            return { ...it, is_in_stock: true };
           }
           return it;
         });
@@ -150,6 +146,11 @@ export default function AppShell({ children }: AppShellProps) {
   const handleDeleteDemand = async (id: string) => {
     await deleteClientDemand(id);
     await loadData();
+  };
+
+  const handleDeleteBulkCustomers = async (clientIds: string[]) => {
+    await deleteBulkCustomers(clientIds);
+    await loadData(true);
   };
 
   const handleArchiveBatch = async (newBatchName: string) => {
@@ -180,6 +181,7 @@ export default function AppShell({ children }: AppShellProps) {
               handleUpdateItemState,
               handleAutoAllocateStock,
               handleDeleteDemand,
+              handleDeleteBulkCustomers,
               handleArchiveBatch,
             })
           )}

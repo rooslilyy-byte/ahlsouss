@@ -218,14 +218,39 @@ export async function createClientDemand(
     if (existingClient) {
       const { data: demand } = await supabase.from('client_demands').insert({ client_id: existingClient.id, batch_id: activeBatch.id, status: 'pending' }).select().single();
       if (demand) {
-        const demandItems = items.map(it => ({
-          demand_id: demand.id,
-          product_name: it.product_name,
-          quantity: Math.max(1, Math.floor(it.quantity || 1)),
-          is_in_stock: false,
-          is_delivered: false,
-        }));
-        await supabase.from('demand_items').insert(demandItems);
+        for (const it of items) {
+          const prodName = it.product_name.trim();
+          const qty = Math.max(1, Math.floor(it.quantity || 1));
+
+          // Check stock
+          const { data: masterProd } = await supabase
+            .from('master_products')
+            .select('*')
+            .ilike('name', prodName)
+            .maybeSingle();
+
+          const available = masterProd?.available_stock || 0;
+          let isInStock = false;
+
+          if (available >= qty) {
+            isInStock = true;
+            // Decrement available stock
+            if (masterProd?.id) {
+              await supabase
+                .from('master_products')
+                .update({ available_stock: available - qty })
+                .eq('id', masterProd.id);
+            }
+          }
+
+          await supabase.from('demand_items').insert({
+            demand_id: demand.id,
+            product_name: prodName,
+            quantity: qty,
+            is_in_stock: isInStock,
+            is_delivered: false,
+          });
+        }
       }
     }
     invalidateStoreCache();
@@ -285,30 +310,16 @@ export async function autoAllocateStock(
             !item.is_delivered
           ) {
             const needed = item.quantity;
-            if (remaining >= needed) {
-              await supabase.from('demand_items').update({ is_in_stock: true }).eq('id', item.id);
-              remaining -= needed;
+            const fulfilled = Math.min(remaining, needed);
 
-              const key = cli.phone;
-              if (!allocatedMap[key]) {
-                allocatedMap[key] = { clientName: cli.name, phone: cli.phone, totalFulfilled: 0 };
-              }
-              allocatedMap[key].totalFulfilled += needed;
-            } else {
-              const fulfilled = remaining;
-              const missingLeft = needed - fulfilled;
+            await supabase.from('demand_items').update({ is_in_stock: true }).eq('id', item.id);
+            remaining -= needed;
 
-              await supabase.from('demand_items').update({ quantity: missingLeft, is_in_stock: false }).eq('id', item.id);
-              await supabase.from('demand_items').insert({ demand_id: dem.id, product_name: cleanName, quantity: fulfilled, is_in_stock: true, is_delivered: false });
-
-              remaining = 0;
-
-              const key = cli.phone;
-              if (!allocatedMap[key]) {
-                allocatedMap[key] = { clientName: cli.name, phone: cli.phone, totalFulfilled: 0 };
-              }
-              allocatedMap[key].totalFulfilled += fulfilled;
+            const key = cli.phone;
+            if (!allocatedMap[key]) {
+              allocatedMap[key] = { clientName: cli.name, phone: cli.phone, totalFulfilled: 0 };
             }
+            allocatedMap[key].totalFulfilled += fulfilled;
           }
         }
       }
@@ -344,6 +355,21 @@ export async function deleteClientDemand(demandId: string): Promise<void> {
 
   if (isSupabaseConfigured) {
     await supabase.from('client_demands').delete().eq('id', demandId);
+    invalidateStoreCache();
+  }
+}
+
+export async function deleteBulkCustomers(clientIds: string[]): Promise<void> {
+  if (!clientIds || clientIds.length === 0) return;
+
+  if (isBrowser) {
+    await fetchStoreApi('delete_bulk_customers', { clientIds });
+    return;
+  }
+
+  if (isSupabaseConfigured) {
+    await supabase.from('client_demands').delete().in('client_id', clientIds);
+    await supabase.from('clients').delete().in('id', clientIds);
     invalidateStoreCache();
   }
 }

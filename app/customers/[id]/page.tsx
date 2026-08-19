@@ -2,7 +2,7 @@
 
 import React, { use } from 'react';
 import AppShell from '@/components/AppShell';
-import DemandsList from '@/components/DemandsList';
+import CustomerDetails from '@/components/CustomerDetails';
 
 export default function SingleCustomerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -12,19 +12,17 @@ export default function SingleCustomerPage({ params }: { params: Promise<{ id: s
       {({
         demands,
         masterProducts,
-        handleCreateDemand,
         handleUpdateDemand,
         handleUpdateItemState,
         handleDeleteDemand,
       }) => (
-        <DemandsList
+        <CustomerDetails
+          id={id}
           demands={demands}
           masterProducts={masterProducts}
-          onCreateDemand={handleCreateDemand}
           onUpdateDemand={handleUpdateDemand}
           onUpdateItemState={handleUpdateItemState}
           onDeleteDemand={handleDeleteDemand}
-          initialSearchQuery={decodeURIComponent(id)}
         />
       )}
     </AppShell>

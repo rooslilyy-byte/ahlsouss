@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   PackageCheck, 
   CheckCircle2, 
   Search, 
   Layers, 
-  Package
+  Package,
+  X
 } from 'lucide-react';
 import { ClientDemand, MasterProduct } from '@/lib/types';
 import { updateMasterProductStock } from '@/lib/dataStore';
@@ -31,9 +32,22 @@ export default function StockAllocation({
   onAutoAllocateStock,
 }: StockAllocationProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [receivedQtyMap, setReceivedQtyMap] = useState<Record<string, number>>({});
   const [processingProduct, setProcessingProduct] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
+
+  // Modal State
+  const [modalProduct, setModalProduct] = useState<{ productName: string; totalMissingQty: number } | null>(null);
+  const [modalQty, setModalQty] = useState<string>('');
+  const [isProcessingModal, setIsProcessingModal] = useState(false);
+  const modalInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (modalProduct) {
+      setTimeout(() => {
+        modalInputRef.current?.focus();
+      }, 50);
+    }
+  }, [modalProduct]);
 
   // 1. Calculate Active Missing Products Aggregation
   const missingProductsList = useMemo(() => {
@@ -94,25 +108,33 @@ export default function StockAllocation({
   const totalMissingItemsCount = missingProductsList.length;
   const totalMissingPiecesCount = missingProductsList.reduce((acc, p) => acc + p.totalMissingQty, 0);
 
-  // Handle Auto-Allocation for a specific row
-  const handleConfirmReady = async (productName: string, defaultMissingQty: number) => {
-    const qtyToAllocate = receivedQtyMap[productName] !== undefined 
-      ? receivedQtyMap[productName] 
-      : defaultMissingQty;
+  // Handle Modal Open
+  const handleOpenModal = (productName: string, totalMissingQty: number) => {
+    setModalProduct({ productName, totalMissingQty });
+    setModalQty('');
+  };
 
-    if (qtyToAllocate <= 0) {
+  // Handle Allocation Submit from Modal
+  const handleModalSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!modalProduct) return;
+
+    const parsedQty = parseInt(modalQty.trim(), 10);
+    if (isNaN(parsedQty) || parsedQty <= 0) {
       alert('يرجى إدخال كمية مستلمة صحيحة أكبر من الصفر');
       return;
     }
 
+    const productName = modalProduct.productName;
     setProcessingProduct(productName);
+    setIsProcessingModal(true);
 
     try {
       if (onAutoAllocateStock) {
-        await onAutoAllocateStock(productName, qtyToAllocate);
+        await onAutoAllocateStock(productName, parsedQty);
       } else {
         // Fallback manually if onAutoAllocateStock is not provided
-        let remaining = qtyToAllocate;
+        let remaining = parsedQty;
         const targetProd = missingProductsList.find(p => p.productName === productName);
 
         if (targetProd) {
@@ -124,10 +146,8 @@ export default function StockAllocation({
                 for (const it of dem.items) {
                   if (it.product_name.trim().toLowerCase() === productName.toLowerCase() && !it.is_in_stock && !it.is_delivered) {
                     const needed = it.quantity;
-                    if (remaining >= needed) {
-                      await onUpdateItemState(it.id, { is_in_stock: true });
-                      remaining -= needed;
-                    }
+                    await onUpdateItemState(it.id, { is_in_stock: true });
+                    remaining -= needed;
                   }
                 }
               }
@@ -139,11 +159,8 @@ export default function StockAllocation({
         }
       }
 
-      setReceivedQtyMap(prev => {
-        const next = { ...prev };
-        delete next[productName];
-        return next;
-      });
+      setModalProduct(null);
+      setModalQty('');
 
       // Show lightweight 2.5s Toast notification
       setShowToast(true);
@@ -156,92 +173,66 @@ export default function StockAllocation({
       alert('حدث خطأ أثناء تخصيص السلعة، يرجى إعادة المحاولة.');
     } finally {
       setProcessingProduct(null);
+      setIsProcessingModal(false);
     }
   };
 
   return (
-    <div className="space-y-6 relative">
+    <div className="space-y-4 relative">
       
       {/* 1. Header Banner */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold shrink-0">
+              <PackageCheck className="w-4.5 h-4.5" />
+            </div>
+            <h2 className="text-base font-bold text-slate-900">توزيع واستقبال السلع</h2>
+          </div>
+
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-bold shadow-md shrink-0">
-              <PackageCheck className="w-6 h-6" />
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
+              <span className="text-slate-500">العناوين المعلقة:</span>
+              <strong className="text-slate-900">{totalMissingItemsCount}</strong>
             </div>
-            <div>
-              <h2 className="text-lg sm:text-xl font-black text-slate-900">استقبال وتوزيع السلع المستلمة (Stock Allocation)</h2>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">
-                قائمة حية ومباشرة بالكتب والسلع الناقصة لتأكيد استلام الموردين والتوزيع التلقائي
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Live Metrics Summary Bar */}
-        <div className="grid grid-cols-2 gap-3 mt-5 pt-4 border-t border-slate-100">
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-amber-100 text-amber-900 font-bold flex items-center justify-center shrink-0">
-              <Layers className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="text-[11px] text-slate-500 font-bold block">العناوين المعلقة الناقصة</span>
-              <span className="text-lg font-black text-slate-900">{totalMissingItemsCount} عنوان</span>
-            </div>
-          </div>
-
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-sky-100 text-sky-900 font-bold flex items-center justify-center shrink-0">
-              <Package className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="text-[11px] text-slate-500 font-bold block">إجمالي القطع المطلوبة</span>
-              <span className="text-lg font-black text-sky-900">{totalMissingPiecesCount} قطعة</span>
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
+              <span className="text-slate-500">القطع المطلوبة:</span>
+              <strong className="text-slate-900">{totalMissingPiecesCount}</strong>
             </div>
           </div>
         </div>
       </div>
 
       {/* 2. MAIN VIEW: Active Missing Products List Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm space-y-4">
+      <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm space-y-3">
         
         {/* Search Filter Header */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pb-2 border-b border-slate-100">
-          <div>
-            <h3 className="font-black text-slate-900 text-base">قائمة السلع والكتب الناقصة المطلوب استلامها</h3>
-            <p className="text-xs text-slate-500">أدخل الكمية المستلمة واضغط "جاهز" لتوزيعها فوراً على الطلبات المعلقة</p>
-          </div>
+        <div className="flex items-center justify-between gap-3 pb-2 border-b border-slate-100">
+          <span className="text-xs font-bold text-slate-700">قائمة الخصاصات المطلوب توفيرها</span>
 
-          <div className="relative w-full sm:w-72">
-            <Search className="w-4 h-4 text-slate-400 absolute right-3 top-3" />
+          <div className="relative w-full sm:w-60">
+            <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
             <input
               type="text"
-              placeholder="ابحث بالاسم أو السلسلة..."
+              placeholder="البحث بالاسم..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl pr-9 pl-4 py-2 text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:border-slate-800 transition-colors min-h-[40px]"
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg pr-9 pl-3 h-9 text-xs sm:text-sm text-slate-900 focus:bg-white focus:outline-none focus:border-slate-800 font-medium transition-colors"
             />
           </div>
         </div>
 
         {/* Missing Products List / Table */}
         {filteredMissingProducts.length === 0 ? (
-          <div className="text-center py-16 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50 space-y-3">
-            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-7 h-7" />
-            </div>
-            <div>
-              <h4 className="font-extrabold text-slate-800 text-base">ممتاز! لا توجد كتب أو مستلزمات ناقصة حالياً</h4>
-              <p className="text-xs text-slate-500 mt-1">جميع طلبات الزبناء في هذه الدفعة إما متوفرة بالكامل أو تم تسليمها.</p>
-            </div>
+          <div className="text-center py-10 border border-dashed border-slate-200 rounded-xl bg-slate-50/50 space-y-2">
+            <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto" />
+            <p className="font-bold text-slate-800 text-sm">جميع كتب هذه الدفعة متوفرة بالكامل</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {filteredMissingProducts.map((item) => {
               const isProcessing = processingProduct === item.productName;
-              const currentInputVal = receivedQtyMap[item.productName] !== undefined 
-                ? receivedQtyMap[item.productName] 
-                : item.totalMissingQty;
+              const distinctClientsCount = new Set(item.clients.map(c => c.phone)).size;
 
               return (
                 <div 
@@ -266,47 +257,20 @@ export default function StockAllocation({
                     <p className="text-xs text-slate-500 font-medium flex items-center gap-2 flex-wrap">
                       <span>الكمية المطلوبة للزبناء: <strong className="text-slate-900 font-extrabold">{item.totalMissingQty} قطعة</strong></span>
                       <span>•</span>
-                      <span>ينتظره <strong className="text-slate-900 font-extrabold">{item.clients.length} زبناء</strong></span>
+                      <span>ينتظره <strong className="text-slate-900 font-extrabold">{distinctClientsCount} زبناء</strong></span>
                     </p>
                   </div>
 
-                  {/* Right: Interactive Inline Controls (Input + Ready Button) */}
-                  <div className="flex items-center gap-3 w-full md:w-auto border-t md:border-t-0 border-slate-100 pt-3 md:pt-0 justify-between md:justify-end">
-                    
-                    {/* Inline Received Qty Input */}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <label className="text-xs font-bold text-slate-700 shrink-0 hidden sm:inline">الكمية المستلمة:</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={currentInputVal}
-                        onKeyDown={(e) => {
-                          if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') {
-                            e.preventDefault();
-                          }
-                        }}
-                        onChange={(e) => {
-                          const val = Math.max(1, parseInt(e.target.value) || 0);
-                          setReceivedQtyMap({
-                            ...receivedQtyMap,
-                            [item.productName]: val,
-                          });
-                        }}
-                        className="w-20 bg-slate-50 border border-slate-300 focus:bg-white rounded-xl py-2 px-2 text-center text-sm font-black text-slate-900 focus:outline-none focus:border-slate-900 min-h-[44px]"
-                        title="الكمية المستلمة من المورد"
-                      />
-                    </div>
-
-                    {/* Inline Ready Action Button */}
+                  {/* Right: Clean Action Button (Triggers Quantity Modal) */}
+                  <div className="flex items-center gap-3 w-full md:w-auto border-t md:border-t-0 border-slate-100 pt-3 md:pt-0 justify-end">
                     <button
-                      onClick={() => handleConfirmReady(item.productName, item.totalMissingQty)}
+                      onClick={() => handleOpenModal(item.productName, item.totalMissingQty)}
                       disabled={isProcessing}
-                      className="flex-1 md:flex-none bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-md flex items-center justify-center gap-2 transition-all disabled:opacity-50 min-h-[44px]"
+                      className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs sm:text-sm px-6 py-2.5 rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 min-h-[44px]"
                     >
                       <CheckCircle2 className="w-4.5 h-4.5 text-white" />
-                      <span>{isProcessing ? 'جاري التوزيع...' : 'جاهز / تأكيد واستلام'}</span>
+                      <span>{isProcessing ? 'جاري التوزيع...' : 'جاهز'}</span>
                     </button>
-
                   </div>
 
                 </div>
@@ -317,7 +281,97 @@ export default function StockAllocation({
 
       </div>
 
-      {/* 3. Sleek Floating Toast Notification (Top-Center 2.5s Auto-dismiss) */}
+      {/* 3. Confirmation Input Modal */}
+      {modalProduct && (
+        <div 
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setModalProduct(null);
+              setModalQty('');
+            }
+          }}
+        >
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl max-w-md w-full space-y-5 text-right relative animate-in zoom-in-95 duration-200" dir="rtl">
+            
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold shrink-0">
+                  <PackageCheck className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-black text-slate-900 text-base sm:text-lg leading-tight truncate">
+                    تأكيد استلام السلعة: {modalProduct.productName}
+                  </h3>
+                  <p className="text-xs font-bold text-slate-500 mt-1">
+                    الكمية المطلوبة للزبناء: <span className="text-blue-700 font-black">{modalProduct.totalMissingQty} قطعة</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setModalProduct(null);
+                  setModalQty('');
+                }}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 transition-colors shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleModalSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-extrabold text-slate-800 mb-2">
+                  كم عدد القطع المستلمة؟
+                </label>
+                <input
+                  ref={modalInputRef}
+                  type="number"
+                  min="1"
+                  autoFocus
+                  value={modalQty}
+                  onChange={(e) => setModalQty(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') {
+                      e.preventDefault();
+                    }
+                  }}
+                  placeholder="أدخل عدد القطع المستلمة..."
+                  className="w-full bg-slate-50 border border-slate-300 focus:bg-white rounded-2xl py-3 px-4 text-base font-black text-slate-900 focus:outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-900/10 transition-all text-center placeholder:text-slate-400 placeholder:font-normal"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={isProcessingModal}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm py-3 px-4 rounded-xl shadow-lg shadow-blue-700/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 min-h-[44px]"
+                >
+                  <CheckCircle2 className="w-4.5 h-4.5" />
+                  <span>{isProcessingModal ? 'جاري التوزيع...' : 'تأكيد'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalProduct(null);
+                    setModalQty('');
+                  }}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm py-3 px-4 rounded-xl transition-colors min-h-[44px]"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* 4. Sleek Floating Toast Notification */}
       {showToast && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white backdrop-blur shadow-2xl border border-slate-700/80 rounded-2xl px-4 py-2.5 flex items-center gap-2.5 animate-in fade-in slide-in-from-top-4 duration-200">
           <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />

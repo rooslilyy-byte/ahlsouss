@@ -10,11 +10,14 @@ export default function CustomersPage() {
 
   return (
     <AppShell>
-      {({ demands }) => (
+      {({ demands, masterProducts, handleCreateDemand, handleDeleteBulkCustomers }) => (
         <CustomersDirectory
           demands={demands}
+          masterProducts={masterProducts}
+          onCreateDemand={handleCreateDemand}
+          onDeleteBulkCustomers={handleDeleteBulkCustomers}
           onSelectCustomer={(clientPhone) => {
-            router.push(`/demands?search=${encodeURIComponent(clientPhone)}`);
+            router.push(`/customers/${encodeURIComponent(clientPhone)}`);
           }}
         />
       )}

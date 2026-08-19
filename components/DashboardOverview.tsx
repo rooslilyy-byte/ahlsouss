@@ -53,48 +53,43 @@ export default function DashboardOverview({
   }, [demands]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       
       {/* 1. Header Banner */}
-      <div className="bg-slate-900 text-white rounded-2xl p-6 shadow-md border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-extrabold text-white">لوحة تحكّم المكتبة</h2>
-            <span className="bg-slate-800 text-slate-300 text-xs font-bold px-2.5 py-0.5 rounded border border-slate-700">
-              موسم الدخول المدرسي
-            </span>
-          </div>
-          <p className="text-xs text-slate-400 mt-1">
-            مكتبة وراقة اهل سوس • نظام متابعة وتوزيع خصاصات الكتب في الوقت الفعلي
-          </p>
+      <div className="bg-slate-900 text-white rounded-xl p-3.5 shadow-sm border border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <h2 className="text-base font-bold text-white">لوحة تحكّم المكتبة</h2>
+          <span className="bg-slate-800 text-slate-300 text-[11px] font-medium px-2 py-0.5 rounded border border-slate-700">
+            موسم الدخول المدرسي
+          </span>
         </div>
 
         <Link
-          href="/demands"
-          className="bg-slate-100 hover:bg-white text-slate-900 text-xs font-bold px-4 py-2.5 rounded-xl shadow flex items-center gap-2 transition-all active:scale-95 min-h-[44px]"
+          href="/customers"
+          className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold h-9 px-3.5 rounded-lg shadow-sm flex items-center justify-center gap-1.5 transition-colors"
         >
-          <Plus className="w-4 h-4 text-slate-900 shrink-0" />
-          <span>تسجيل طلب جديد</span>
+          <Plus className="w-4 h-4 text-white shrink-0" />
+          <span>إضافة طلب جديد</span>
         </Link>
       </div>
 
       {/* 2. Professional ERP KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         
         {/* Total Demands Card */}
         <Link 
-          href="/demands"
-          className="bg-white border border-slate-200 hover:border-slate-300 transition-all rounded-2xl p-5 shadow-sm block group"
+          href="/customers"
+          className="bg-white border border-slate-200 hover:border-slate-300 transition-colors rounded-xl p-3.5 shadow-sm block group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 group-hover:text-slate-900 transition-colors">إجمالي الطلبات</span>
-            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
-              <BookOpen className="w-5 h-5" />
+            <span className="text-xs font-semibold text-slate-500 group-hover:text-slate-900 transition-colors">إجمالي الطلبات</span>
+            <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-700">
+              <BookOpen className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-slate-900">{stats.totalDemands}</span>
-            <span className="text-xs text-slate-500 font-medium">طلب مسجل</span>
+          <div className="mt-2 flex items-baseline gap-1.5">
+            <span className="text-2xl font-bold text-slate-900">{stats.totalDemands}</span>
+            <span className="text-xs text-slate-500 font-medium">طلب</span>
           </div>
           <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
             <span>مجموع القطع المطلوبة:</span>
@@ -104,7 +99,7 @@ export default function DashboardOverview({
 
         {/* Pending Card */}
         <Link 
-          href="/demands"
+          href="/customers"
           className="bg-white border border-rose-200 hover:border-rose-300 transition-all rounded-2xl p-5 shadow-sm block group"
         >
           <div className="flex items-center justify-between">
@@ -124,7 +119,7 @@ export default function DashboardOverview({
 
         {/* Partial Card */}
         <Link 
-          href="/demands"
+          href="/customers"
           className="bg-white border border-amber-200 hover:border-amber-300 transition-all rounded-2xl p-5 shadow-sm block group"
         >
           <div className="flex items-center justify-between">
@@ -144,7 +139,7 @@ export default function DashboardOverview({
 
         {/* Completed Card */}
         <Link 
-          href="/demands"
+          href="/customers"
           className="bg-white border border-emerald-200 hover:border-emerald-300 transition-all rounded-2xl p-5 shadow-sm block group"
         >
           <div className="flex items-center justify-between">
@@ -169,7 +164,7 @@ export default function DashboardOverview({
         
         {/* Card 1: Add Client & Demand */}
         <Link
-          href="/demands"
+          href="/customers"
           className="bg-slate-900 hover:bg-slate-800 text-white border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-md transition-all active:scale-[0.98] flex flex-col justify-between space-y-4 group min-h-[140px] w-full"
         >
           <div className="flex items-center justify-between">

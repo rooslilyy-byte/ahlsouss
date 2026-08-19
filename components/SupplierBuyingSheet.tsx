@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Printer, FileText, ShoppingCart, Users } from 'lucide-react';
+import { Printer, FileText, ShoppingCart, Users, CheckCircle2 } from 'lucide-react';
 import { SupplierAggregatedItem, PurchaseBatch, ClientDemand } from '@/lib/types';
 import { getSupplierAggregatedReport } from '@/lib/dataStore';
 
@@ -92,53 +92,35 @@ export default function SupplierBuyingSheet({
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       
       {/* 1. Screen Header Controls (NO-PRINT) */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 no-print">
-        <div>
-          <div className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-slate-700" />
-            <h2 className="text-lg sm:text-xl font-extrabold text-slate-900">قائمة المشتريات المعلقة للموردين (A4 Supplier Sheet)</h2>
+      <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 no-print">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center font-bold shrink-0">
+            <FileText className="w-4.5 h-4.5" />
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            تقرير تجميعي بالكتب والسلع المعلقة للدفعة الحالية: <span className="font-bold text-slate-800">{activeBatch?.batch_name}</span>
-          </p>
+          <h2 className="text-base font-bold text-slate-900">تقرير مشتريات الموردين</h2>
         </div>
 
         {/* Page-level action buttons: ONLY A4 Print button */}
         <div className="flex items-center gap-2 flex-wrap w-full md:w-auto justify-end">
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 px-3 h-9 rounded-lg">
+            <span className="text-slate-500">العناوين:</span>
+            <strong className="text-slate-900">{totalItemTypes}</strong>
+            <span className="text-slate-300">|</span>
+            <span className="text-slate-500">مجموع القطع:</span>
+            <strong className="text-slate-900">{totalPiecesCount}</strong>
+          </div>
+
           <button
             onClick={handlePrint}
             disabled={report.length === 0}
-            className="bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold py-2.5 px-4 rounded-xl shadow-md flex items-center gap-2 transition-all disabled:opacity-50 min-h-[44px]"
+            className="bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold h-9 px-3.5 rounded-lg shadow-sm flex items-center gap-1.5 transition-all disabled:opacity-50"
           >
             <Printer className="w-4 h-4 text-white" />
-            <span>طباعة القائمة A4</span>
+            <span>طباعة A4</span>
           </button>
-        </div>
-      </div>
-
-      {/* 2. Screen Metrics (NO-PRINT) */}
-      <div className="grid grid-cols-2 gap-4 no-print">
-        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center font-bold shrink-0">
-            <ShoppingCart className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-xs text-slate-500 block">العناوين المعلقة</span>
-            <span className="text-xl font-black text-slate-900">{totalItemTypes} عنوان</span>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0">
-            <Users className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-xs text-slate-500 block">مجموع القطع للجملة</span>
-            <span className="text-xl font-black text-emerald-700">{totalPiecesCount} قطعة</span>
-          </div>
         </div>
       </div>
 
@@ -147,8 +129,12 @@ export default function SupplierBuyingSheet({
         {isLoading ? (
           <div className="text-center py-12 text-slate-500 font-bold">جاري تحميل تقرير المشتريات...</div>
         ) : report.length === 0 ? (
-          <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-xl">
-            <p className="text-slate-600 font-bold">لا توجد سلع معلقة حالياً في هذه الدفعة</p>
+          <div className="text-center py-12 border-2 border-dashed border-emerald-200 bg-emerald-50/50 rounded-2xl space-y-2">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+            <p className="text-emerald-800 font-black text-base sm:text-lg">جميع الكتب متوفرة في المخزون</p>
+            <p className="text-xs font-bold text-emerald-600">لا توجد خصاصات معلقة للموردين في الوقت الحالي</p>
           </div>
         ) : (
           <>
