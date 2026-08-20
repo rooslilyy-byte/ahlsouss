@@ -5,8 +5,6 @@ import {
   PackageCheck, 
   CheckCircle2, 
   Search, 
-  Layers, 
-  Package,
   X
 } from 'lucide-react';
 import { ClientDemand, MasterProduct } from '@/lib/types';
@@ -178,24 +176,27 @@ export default function StockAllocation({
   };
 
   return (
-    <div className="space-y-4 relative">
+    <div className="space-y-3 relative">
       
       {/* 1. Header Banner */}
-      <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold shrink-0">
-              <PackageCheck className="w-4.5 h-4.5" />
+      <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold shrink-0">
+              <PackageCheck className="w-4 h-4" />
             </div>
-            <h2 className="text-base font-bold text-slate-900">توزيع واستقبال السلع</h2>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">توزيع واستقبال السلع</h2>
+              <p className="text-[11px] text-slate-500">توزيع مباشر للسلع الواصلة على الزبناء حسب الأسبقية</p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
-              <span className="text-slate-500">العناوين المعلقة:</span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 text-xs text-slate-700 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
+              <span className="text-slate-500">العناوين:</span>
               <strong className="text-slate-900">{totalMissingItemsCount}</strong>
             </div>
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
+            <div className="flex items-center gap-1.5 text-xs text-slate-700 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
               <span className="text-slate-500">القطع المطلوبة:</span>
               <strong className="text-slate-900">{totalMissingPiecesCount}</strong>
             </div>
@@ -204,71 +205,58 @@ export default function StockAllocation({
       </div>
 
       {/* 2. MAIN VIEW: Active Missing Products List Table */}
-      <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm space-y-3">
+      <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs space-y-2.5">
         
         {/* Search Filter Header */}
         <div className="flex items-center justify-between gap-3 pb-2 border-b border-slate-100">
-          <span className="text-xs font-bold text-slate-700">قائمة الخصاصات المطلوب توفيرها</span>
+          <span className="text-base font-bold text-slate-800">قائمة الخصاصات المطلوب توفيرها</span>
 
           <div className="relative w-full sm:w-60">
-            <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-2.5" />
             <input
               type="text"
               placeholder="البحث بالاسم..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg pr-9 pl-3 h-9 text-xs sm:text-sm text-slate-900 focus:bg-white focus:outline-none focus:border-slate-800 font-medium transition-colors"
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg pr-8 pl-3 h-8 text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-slate-800 font-medium transition-colors"
             />
           </div>
         </div>
 
         {/* Missing Products List / Table */}
         {filteredMissingProducts.length === 0 ? (
-          <div className="text-center py-10 border border-dashed border-slate-200 rounded-xl bg-slate-50/50 space-y-2">
-            <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto" />
-            <p className="font-bold text-slate-800 text-sm">جميع كتب هذه الدفعة متوفرة بالكامل</p>
+          <div className="text-center py-8 border border-dashed border-slate-200 rounded-lg bg-slate-50/50 space-y-1.5">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 mx-auto" />
+            <p className="font-bold text-slate-800 text-xs">جميع كتب هذه الدفعة متوفرة بالكامل</p>
           </div>
         ) : (
-          <div className="space-y-2.5">
+          <div className="space-y-1.5">
             {filteredMissingProducts.map((item) => {
               const isProcessing = processingProduct === item.productName;
-              const distinctClientsCount = new Set(item.clients.map(c => c.phone)).size;
 
               return (
                 <div 
                   key={item.productName}
-                  className="border border-slate-200 bg-white hover:border-slate-300 rounded-2xl transition-all duration-200 p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+                  className="border border-slate-200 bg-white hover:border-slate-300 rounded-lg py-2 px-3 flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5 transition-colors"
                 >
-                  {/* Left: Product Meta & Badge */}
-                  <div className="space-y-1.5 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-bold px-2 py-0.5 rounded-md">
-                        {item.category}
-                      </span>
-                      {item.availableStock > 0 && (
-                        <span className="bg-sky-100 text-sky-900 border border-sky-300 text-[11px] font-black px-2 py-0.5 rounded-md">
-                          متوفر بالرفوف: {item.availableStock}
-                        </span>
-                      )}
-                    </div>
-                    <h4 className="font-black text-slate-900 text-base sm:text-lg leading-snug">
+                  {/* Left: Product Name & Required Quantity */}
+                  <div className="space-y-0.5 flex-1 min-w-0">
+                    <h4 className="text-base font-bold text-slate-900 leading-tight truncate">
                       {item.productName}
                     </h4>
-                    <p className="text-xs text-slate-500 font-medium flex items-center gap-2 flex-wrap">
-                      <span>الكمية المطلوبة للزبناء: <strong className="text-slate-900 font-extrabold">{item.totalMissingQty} قطعة</strong></span>
-                      <span>•</span>
-                      <span>ينتظره <strong className="text-slate-900 font-extrabold">{distinctClientsCount} زبناء</strong></span>
+                    <p className="text-sm text-slate-500">
+                      الكمية المطلوبة: <strong className="text-slate-800 font-semibold">{item.totalMissingQty} قطعة</strong>
                     </p>
                   </div>
 
-                  {/* Right: Clean Action Button (Triggers Quantity Modal) */}
-                  <div className="flex items-center gap-3 w-full md:w-auto border-t md:border-t-0 border-slate-100 pt-3 md:pt-0 justify-end">
+                  {/* Right: Compact Standard Button */}
+                  <div className="flex items-center gap-2 w-full md:w-auto border-t md:border-t-0 border-slate-100 pt-2 md:pt-0 justify-end">
                     <button
                       onClick={() => handleOpenModal(item.productName, item.totalMissingQty)}
                       disabled={isProcessing}
-                      className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs sm:text-sm px-6 py-2.5 rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 min-h-[44px]"
+                      className="h-8 px-3.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-1.5 shadow-2xs transition-colors disabled:opacity-50 w-full md:w-auto shrink-0"
                     >
-                      <CheckCircle2 className="w-4.5 h-4.5 text-white" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-white" />
                       <span>{isProcessing ? 'جاري التوزيع...' : 'جاهز'}</span>
                     </button>
                   </div>
@@ -284,7 +272,7 @@ export default function StockAllocation({
       {/* 3. Confirmation Input Modal */}
       {modalProduct && (
         <div 
-          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setModalProduct(null);
@@ -292,20 +280,20 @@ export default function StockAllocation({
             }
           }}
         >
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl max-w-md w-full space-y-5 text-right relative animate-in zoom-in-95 duration-200" dir="rtl">
+          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xl max-w-sm w-full space-y-3.5 text-right relative animate-in zoom-in-95 duration-150" dir="rtl">
             
             {/* Modal Header */}
-            <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold shrink-0">
-                  <PackageCheck className="w-5 h-5" />
+            <div className="flex items-start justify-between gap-2.5 border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold shrink-0">
+                  <PackageCheck className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="font-black text-slate-900 text-base sm:text-lg leading-tight truncate">
-                    تأكيد استلام السلعة: {modalProduct.productName}
+                  <h3 className="font-bold text-slate-900 text-sm leading-tight truncate">
+                    استلام: {modalProduct.productName}
                   </h3>
-                  <p className="text-xs font-bold text-slate-500 mt-1">
-                    الكمية المطلوبة للزبناء: <span className="text-blue-700 font-black">{modalProduct.totalMissingQty} قطعة</span>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    الكمية المطلوبة: <span className="text-blue-700 font-semibold">{modalProduct.totalMissingQty} قطعة</span>
                   </p>
                 </div>
               </div>
@@ -315,17 +303,17 @@ export default function StockAllocation({
                   setModalProduct(null);
                   setModalQty('');
                 }}
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 transition-colors shrink-0"
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors shrink-0"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleModalSubmit} className="space-y-4">
+            <form onSubmit={handleModalSubmit} className="space-y-3">
               <div>
-                <label className="block text-xs font-extrabold text-slate-800 mb-2">
-                  كم عدد القطع المستلمة؟
+                <label className="block text-xs font-semibold text-slate-800 mb-1.5">
+                  عدد القطع المستلمة:
                 </label>
                 <input
                   ref={modalInputRef}
@@ -339,20 +327,20 @@ export default function StockAllocation({
                       e.preventDefault();
                     }
                   }}
-                  placeholder="أدخل عدد القطع المستلمة..."
-                  className="w-full bg-slate-50 border border-slate-300 focus:bg-white rounded-2xl py-3 px-4 text-base font-black text-slate-900 focus:outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-900/10 transition-all text-center placeholder:text-slate-400 placeholder:font-normal"
+                  placeholder="الكمية..."
+                  className="w-full bg-slate-50 border border-slate-300 focus:bg-white rounded-lg h-9 px-3 text-sm font-bold text-slate-900 focus:outline-none focus:border-slate-800 transition-colors text-center"
                 />
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-3 pt-2">
+              <div className="flex items-center gap-2 pt-1">
                 <button
                   type="submit"
                   disabled={isProcessingModal}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm py-3 px-4 rounded-xl shadow-lg shadow-blue-700/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 min-h-[44px]"
+                  className="flex-1 h-8 px-3 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-1.5 shadow-2xs transition-colors disabled:opacity-50"
                 >
-                  <CheckCircle2 className="w-4.5 h-4.5" />
-                  <span>{isProcessingModal ? 'جاري التوزيع...' : 'تأكيد'}</span>
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>{isProcessingModal ? 'جاري...' : 'تأكيد'}</span>
                 </button>
                 <button
                   type="button"
@@ -360,7 +348,7 @@ export default function StockAllocation({
                     setModalProduct(null);
                     setModalQty('');
                   }}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm py-3 px-4 rounded-xl transition-colors min-h-[44px]"
+                  className="h-8 px-3 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
                 >
                   إلغاء
                 </button>
@@ -373,9 +361,9 @@ export default function StockAllocation({
 
       {/* 4. Sleek Floating Toast Notification */}
       {showToast && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white backdrop-blur shadow-2xl border border-slate-700/80 rounded-2xl px-4 py-2.5 flex items-center gap-2.5 animate-in fade-in slide-in-from-top-4 duration-200">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-          <span className="font-extrabold text-xs sm:text-sm tracking-wide">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white backdrop-blur-xs shadow-lg border border-slate-700 rounded-xl px-3.5 py-2 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-150">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span className="font-semibold text-xs tracking-wide">
             تمت إضافة وتوزيع السلعة بنجاح
           </span>
         </div>

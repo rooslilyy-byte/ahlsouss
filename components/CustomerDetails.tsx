@@ -4,7 +4,6 @@ import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
-  User, 
   Phone, 
   Calendar, 
   ArrowRight, 
@@ -15,9 +14,8 @@ import {
   CheckCircle2, 
   AlertCircle, 
   BookOpen,
-  CheckSquare,
-  Square,
-  Package
+  CheckSquare, 
+  Square
 } from 'lucide-react';
 import { ClientDemand, MasterProduct } from '@/lib/types';
 import ThermalReceiptModal from './ThermalReceiptModal';
@@ -58,14 +56,12 @@ export default function CustomerDetails({
   const [isEditing, setIsEditing] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
 
-  // Match target demand/customer by id, client id, phone, or name
+  // Match target demand strictly by demand id or client id (NEVER by phone number)
   const targetDemand = useMemo(() => {
     const cleanId = decodeURIComponent(id).trim();
     return demands.find(d => 
       d.id === cleanId || 
-      d.client?.id === cleanId || 
-      d.client?.phone?.trim() === cleanId ||
-      d.client?.name?.trim() === cleanId
+      d.client?.id === cleanId
     ) || null;
   }, [demands, id]);
 
@@ -99,7 +95,7 @@ export default function CustomerDetails({
 
   const handleDelete = async () => {
     if (!targetDemand) return;
-    if (confirm('هل أنت تأكد من رغبتك في حذف ملف طلبية هذا الزبون نهائياً؟')) {
+    if (confirm('هل أنت متأكد من رغبتك في حذف ملف طلبية هذا الزبون نهائياً؟')) {
       await onDeleteDemand(targetDemand.id);
       router.push('/customers');
     }
@@ -107,20 +103,20 @@ export default function CustomerDetails({
 
   if (!targetDemand) {
     return (
-      <div className="bg-white border border-slate-200 rounded-3xl p-8 sm:p-12 text-center space-y-4 shadow-sm">
-        <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center mx-auto border border-amber-200">
-          <AlertCircle className="w-8 h-8" />
+      <div className="bg-white border border-slate-200 rounded-xl p-6 text-center space-y-3 shadow-2xs">
+        <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center mx-auto border border-amber-200">
+          <AlertCircle className="w-5 h-5" />
         </div>
         <div>
-          <h3 className="font-extrabold text-slate-900 text-lg sm:text-xl">لم يتم العثور على طلبية هذا الزبون</h3>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">قد تكون الطلبية حذفت أو غير متوفرة في الدفعة الحالية.</p>
+          <h3 className="font-bold text-slate-900 text-sm">لم يتم العثور على طلبية هذا الزبون</h3>
+          <p className="text-xs text-slate-500 mt-0.5">قد تكون الطلبية حذفت أو غير متوفرة في الدفعة الحالية.</p>
         </div>
-        <div className="pt-2">
+        <div className="pt-1">
           <Link
             href="/customers"
-            className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-md transition-all"
+            className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-3.5 h-8 rounded-lg shadow-2xs transition-colors"
           >
-            <ArrowRight className="w-4 h-4" />
+            <ArrowRight className="w-3.5 h-3.5" />
             <span>العودة إلى دليل الزبائن</span>
           </Link>
         </div>
@@ -129,48 +125,48 @@ export default function CustomerDetails({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       
       {/* Top Breadcrumb Navigation */}
       <div className="flex items-center justify-between">
         <Link
           href="/customers"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 px-3 h-8 rounded-lg transition-colors shadow-2xs"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 px-2.5 h-7 rounded-lg transition-colors shadow-2xs"
         >
           <ArrowRight className="w-3.5 h-3.5" />
           <span>العودة إلى دليل الزبناء</span>
         </Link>
 
-        <span className="text-xs font-mono font-bold text-slate-400">
+        <span className="text-[11px] font-mono font-bold text-slate-400">
           #ID: {targetDemand.id.substring(0, 8)}
         </span>
       </div>
 
-      {/* 1. Header Banner & Action Toolbar */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-4">
+      {/* 1. Compact Header Banner & Action Toolbar */}
+      <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-3.5 shadow-2xs space-y-3">
         
         {/* Customer Main Metadata & Status */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-base shadow-sm shrink-0">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 border-b border-slate-100 pb-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0">
               {targetDemand.client?.name.substring(0, 2)}
             </div>
 
             <div className="min-w-0 space-y-0.5">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-snug truncate">
+                <h1 className="text-sm sm:text-base font-bold text-slate-900 leading-tight truncate">
                   {targetDemand.client?.name}
                 </h1>
 
                 {/* Overall Demand Status Badge */}
-                <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-md border flex items-center gap-1 ${
+                <span className={`text-[11px] font-medium px-2 py-0.5 rounded flex items-center gap-1 ${
                   stats.isComplete
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    ? 'bg-emerald-50 text-emerald-700'
                     : stats.isReady
-                    ? 'bg-blue-50 text-blue-700 border-blue-200'
+                    ? 'bg-blue-50 text-blue-700'
                     : stats.isPartial
-                    ? 'bg-amber-50 text-amber-700 border-amber-200'
-                    : 'bg-rose-50 text-rose-700 border-rose-200'
+                    ? 'bg-amber-50 text-amber-700'
+                    : 'bg-rose-50 text-rose-700'
                 }`}>
                   {stats.isComplete 
                     ? 'مكتمل (تم التسليم)' 
@@ -182,16 +178,16 @@ export default function CustomerDetails({
                 </span>
               </div>
 
-              <div className="flex items-center gap-3 text-xs font-medium text-slate-500 flex-wrap">
+              <div className="flex items-center gap-2.5 text-xs text-slate-500 flex-wrap">
                 <a 
                   href={`tel:${targetDemand.client?.phone}`}
-                  className="inline-flex items-center gap-1 text-slate-700 hover:text-slate-900 font-mono bg-slate-100 px-2 py-0.5 rounded border border-slate-200 dir-ltr"
+                  className="inline-flex items-center gap-1 text-slate-700 hover:text-slate-900 font-mono bg-slate-100 px-1.5 py-0.5 rounded dir-ltr"
                 >
                   <Phone className="w-3 h-3 text-slate-400" />
                   <span>{targetDemand.client?.phone}</span>
                 </a>
 
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1 text-[11px]">
                   <Calendar className="w-3 h-3 text-slate-400" />
                   <span>تاريخ التسجيل: {new Date(targetDemand.created_at || Date.now()).toLocaleDateString('ar-MA')}</span>
                 </span>
@@ -200,45 +196,44 @@ export default function CustomerDetails({
           </div>
         </div>
 
-        {/* 2. Top Action Buttons Bar */}
-        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
-          
-          {/* 1. Edit Demand */}
+        {/* 2. Compact Standard Action Buttons */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* Edit Demand */}
           <button
             type="button"
             onClick={() => setIsEditing(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm px-3.5 h-9 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+            className="h-8 px-3 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
           >
             <Edit className="w-3.5 h-3.5" />
             <span>تعديل الطلب</span>
           </button>
 
-          {/* 2. Thermal Print Receipt */}
+          {/* Thermal Print Receipt */}
           <button
             type="button"
             onClick={() => setIsPrinting(true)}
-            className="bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs sm:text-sm px-3.5 h-9 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+            className="h-8 px-3 text-xs font-semibold rounded-lg bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
           >
             <Printer className="w-3.5 h-3.5" />
             <span>طباعة الوصل</span>
           </button>
 
-          {/* 3. WhatsApp Notification */}
+          {/* WhatsApp Notification */}
           <a
             href={whatsAppUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs sm:text-sm px-3.5 h-9 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+            className="h-8 px-3 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
           >
             <MessageSquare className="w-3.5 h-3.5" />
             <span>إشعار الواتساب</span>
           </a>
 
-          {/* 4. Delete Demand */}
+          {/* Delete Demand */}
           <button
             type="button"
             onClick={handleDelete}
-            className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-xs sm:text-sm px-3.5 h-9 rounded-lg flex items-center justify-center gap-1.5 transition-colors"
+            className="h-8 px-3 text-xs font-semibold rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 flex items-center justify-center gap-1.5 transition-colors border border-rose-200"
           >
             <Trash2 className="w-3.5 h-3.5 text-rose-600" />
             <span>حذف الطلب</span>
@@ -247,27 +242,27 @@ export default function CustomerDetails({
 
       </div>
 
-      {/* 3. Missing vs. Ready Products List (Real-Time State) */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-7 shadow-sm space-y-4">
+      {/* 3. Missing vs. Ready Products Dense List */}
+      <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-3.5 shadow-2xs space-y-2.5">
         
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3 flex-wrap gap-2">
-          <h3 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-slate-700" />
-            <span>تفاصيل الكتب والمستلزمات المطلوبة ({stats.total} عناوين):</span>
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2 flex-wrap gap-2">
+          <h3 className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-1.5">
+            <BookOpen className="w-4 h-4 text-slate-700" />
+            <span>الكتب والمستلزمات المطلوبة ({stats.total} عناوين):</span>
           </h3>
 
-          <div className="flex items-center gap-2 text-xs font-extrabold">
-            <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-lg">
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold">
+            <span className="bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded">
               {stats.inStock + stats.delivered} متوفر / مسلَم
             </span>
-            <span className="bg-rose-50 text-rose-800 border border-rose-200 px-2.5 py-1 rounded-lg">
+            <span className="bg-rose-50 text-rose-800 px-2 py-0.5 rounded">
               {stats.missing} خصاص معلق
             </span>
           </div>
         </div>
 
-        {/* Product Items List */}
-        <div className="space-y-3">
+        {/* Product Items List - Minimalist Compact Rows */}
+        <div className="space-y-1.5">
           {targetDemand.items?.map((item, idx) => {
             const isInStock = item.is_in_stock;
             const isDelivered = item.is_delivered;
@@ -275,66 +270,66 @@ export default function CustomerDetails({
             return (
               <div
                 key={item.id || idx}
-                className="bg-slate-50/70 border border-slate-200/90 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all hover:bg-slate-50"
+                className="bg-slate-50/70 border border-slate-200 rounded-lg py-2 px-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 transition-colors hover:bg-slate-100/70"
               >
                 
                 {/* Item Details */}
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <span className="w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-900 font-black text-sm flex items-center justify-center shrink-0 shadow-2xs">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <span className="w-7 h-7 rounded-md bg-white border border-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center shrink-0">
                     {item.quantity}
                   </span>
 
                   <div className="min-w-0">
-                    <h4 className="font-black text-slate-900 text-base sm:text-lg leading-snug">
+                    <h4 className="font-semibold text-slate-900 text-sm leading-tight truncate">
                       {item.product_name}
                     </h4>
-                    <p className="text-xs text-slate-500 font-medium mt-0.5">
-                      الكمية المطلوبة: <strong className="text-slate-900 font-extrabold">{item.quantity} قطعة</strong>
+                    <p className="text-xs text-slate-500 font-normal mt-0.5">
+                      الكمية: <span className="font-semibold text-slate-800">{item.quantity} قطعة</span>
                     </p>
                   </div>
                 </div>
 
-                {/* Stock Status Badge & Interactive Toggles */}
+                {/* Stock Status Badge & Interactive Compact Toggles */}
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
                   
-                  {/* Stock Status Badge */}
+                  {/* Subtle Badge */}
                   {isInStock ? (
-                    <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-black px-3 py-1.5 rounded-xl flex items-center gap-1.5 shrink-0">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      <span>متوفر / جاهز للاستلام</span>
+                    <span className="bg-emerald-50 text-emerald-700 text-[11px] font-medium px-2 py-0.5 rounded flex items-center gap-1 shrink-0">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>متوفر / جاهز</span>
                     </span>
                   ) : (
-                    <span className="bg-rose-50 text-rose-700 border border-rose-200 text-xs font-black px-3 py-1.5 rounded-xl flex items-center gap-1.5 shrink-0">
-                      <AlertCircle className="w-4 h-4 text-rose-600" />
-                      <span>خصاص / في انتظار التوفير</span>
+                    <span className="bg-rose-50 text-rose-700 text-[11px] font-medium px-2 py-0.5 rounded flex items-center gap-1 shrink-0">
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                      <span>خصاص معلق</span>
                     </span>
                   )}
 
                   {/* Quick Action Toggle Buttons */}
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1">
                     <button
                       type="button"
                       onClick={() => onUpdateItemState(item.id, { is_in_stock: !item.is_in_stock })}
-                      className={`px-3 py-1.5 rounded-xl font-black text-xs min-h-[38px] transition-all flex items-center gap-1.5 ${
+                      className={`h-8 px-2.5 rounded-lg font-medium text-xs transition-colors flex items-center gap-1 border ${
                         item.is_in_stock 
-                          ? 'bg-sky-100 text-sky-900 border border-sky-300' 
-                          : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-300'
+                          ? 'bg-sky-50 text-sky-900 border-sky-200' 
+                          : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-200'
                       }`}
                     >
-                      {item.is_in_stock ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
+                      {item.is_in_stock ? <CheckSquare className="w-3.5 h-3.5 text-sky-700" /> : <Square className="w-3.5 h-3.5 text-slate-400" />}
                       <span>{item.is_in_stock ? 'بالمحل' : 'توفير'}</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => onUpdateItemState(item.id, { is_delivered: !item.is_delivered })}
-                      className={`px-3 py-1.5 rounded-xl font-black text-xs min-h-[38px] transition-all flex items-center gap-1.5 ${
+                      className={`h-8 px-2.5 rounded-lg font-medium text-xs transition-colors flex items-center gap-1 border ${
                         item.is_delivered 
-                          ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' 
-                          : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-300'
+                          ? 'bg-emerald-50 text-emerald-900 border-emerald-200' 
+                          : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-200'
                       }`}
                     >
-                      {item.is_delivered ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
+                      {item.is_delivered ? <CheckSquare className="w-3.5 h-3.5 text-emerald-700" /> : <Square className="w-3.5 h-3.5 text-slate-400" />}
                       <span>{item.is_delivered ? 'تم التسليم' : 'تسليم'}</span>
                     </button>
                   </div>

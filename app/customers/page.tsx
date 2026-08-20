@@ -16,8 +16,8 @@ export default function CustomersPage() {
           masterProducts={masterProducts}
           onCreateDemand={handleCreateDemand}
           onDeleteBulkCustomers={handleDeleteBulkCustomers}
-          onSelectCustomer={(clientPhone) => {
-            router.push(`/customers/${encodeURIComponent(clientPhone)}`);
+          onSelectCustomer={(customerId) => {
+            router.push(`/customers/${encodeURIComponent(customerId)}`);
           }}
         />
       )}

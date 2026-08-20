@@ -99,25 +99,12 @@ export async function POST(request: Request) {
       }
       const batchId = batchRows[0].id;
 
-      // 2. Find or insert client into public.clients
-      let clientRows = await query(
-        `SELECT * FROM public.clients WHERE phone = $1 LIMIT 1;`,
-        [cleanPhone]
+      // 2. Force brand new client insertion every time (never merge or lookup by phone)
+      const newClientRows = await query(
+        `INSERT INTO public.clients (name, phone) VALUES ($1, $2) RETURNING *;`,
+        [cleanName, cleanPhone]
       );
-
-      let clientId = '';
-      if (clientRows.length > 0) {
-        clientId = clientRows[0].id;
-        if (clientRows[0].name !== cleanName) {
-          await query(`UPDATE public.clients SET name = $1 WHERE id = $2;`, [cleanName, clientId]);
-        }
-      } else {
-        const newClientRows = await query(
-          `INSERT INTO public.clients (name, phone) VALUES ($1, $2) RETURNING *;`,
-          [cleanName, cleanPhone]
-        );
-        clientId = newClientRows[0].id;
-      }
+      const clientId = newClientRows[0].id;
 
       // 3. Create client demand in public.client_demands
       const demandRows = await query(

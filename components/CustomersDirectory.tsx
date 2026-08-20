@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Users, Search, Phone, MessageSquare, ClipboardList, ChevronDown, ChevronUp, BookOpen, Plus, Trash2, X } from 'lucide-react';
+import { Users, Search, Phone, MessageSquare, ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react';
 import { ClientDemand, MasterProduct } from '@/lib/types';
 import CreateDemandModal from './CreateDemandModal';
 
@@ -15,7 +15,7 @@ interface CustomersDirectoryProps {
     items: { product_name: string; quantity: number }[]
   ) => Promise<void>;
   onDeleteBulkCustomers?: (clientIds: string[]) => Promise<void>;
-  onSelectCustomer?: (clientPhone: string) => void;
+  onSelectCustomer?: (demandOrClientId: string) => void;
 }
 
 export default function CustomersDirectory({ 
@@ -26,70 +26,63 @@ export default function CustomersDirectory({
   onSelectCustomer 
 }: CustomersDirectoryProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [expandedCustomerPhone, setExpandedCustomerPhone] = useState<string | null>(null);
+  const [expandedDemandId, setExpandedDemandId] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
-  const customers = useMemo(() => {
-    const map: Record<string, {
-      id: string;
-      name: string;
-      phone: string;
-      createdAt: string;
-      totalDemands: number;
-      totalItems: number;
-      deliveredItems: number;
-      latestDemand: ClientDemand;
-    }> = {};
+  // Each demand is an independent customer entry (never merge duplicates with same phone)
+  const customerEntries = useMemo(() => {
+    return demands
+      .filter((dem): dem is ClientDemand & { client: NonNullable<ClientDemand['client']> } => Boolean(dem.client))
+      .map(dem => {
+        const items = dem.items || [];
+        const totalItems = items.length;
+        const deliveredItems = items.filter(i => i.is_delivered).length;
+        const missingItems = items.filter(i => !i.is_in_stock && !i.is_delivered);
+        const inStockItems = items.filter(i => i.is_in_stock && !i.is_delivered).length;
+        const isComplete = totalItems > 0 && deliveredItems === totalItems;
+        const isReady = !isComplete && totalItems > 0 && (inStockItems + deliveredItems) === totalItems;
 
-    for (const dem of demands) {
-      if (!dem.client?.phone) continue;
-      const phone = dem.client.phone.trim();
-      const itemsCount = dem.items?.length || 0;
-      const delCount = dem.items?.filter(i => i.is_delivered).length || 0;
-
-      if (!map[phone]) {
-        map[phone] = {
-          id: dem.client.id,
+        return {
+          id: dem.id,
+          clientId: dem.client.id,
           name: dem.client.name,
-          phone,
+          phone: dem.client.phone,
           createdAt: dem.created_at || new Date().toISOString(),
-          totalDemands: 1,
-          totalItems: itemsCount,
-          deliveredItems: delCount,
-          latestDemand: dem,
+          status: dem.status,
+          totalItems,
+          deliveredItems,
+          inStockItems,
+          missingItems,
+          missingCount: missingItems.length,
+          isComplete,
+          isReady,
         };
-      } else {
-        map[phone].totalDemands += 1;
-        map[phone].totalItems += itemsCount;
-        map[phone].deliveredItems += delCount;
-      }
-    }
-
-    return Object.values(map).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      })
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [demands]);
 
-  const filteredCustomers = customers.filter(c => 
+  const filteredCustomers = customerEntries.filter(c => 
     !searchQuery.trim() ||
     c.name.toLowerCase().includes(searchQuery.toLowerCase().trim()) ||
     c.phone.includes(searchQuery.trim())
   );
 
-  const isAllSelected = filteredCustomers.length > 0 && filteredCustomers.every(c => selectedCustomerIds.includes(c.id));
+  const isAllSelected = filteredCustomers.length > 0 && filteredCustomers.every(c => selectedCustomerIds.includes(c.clientId));
 
   const handleToggleSelectAll = () => {
     if (isAllSelected) {
       setSelectedCustomerIds([]);
     } else {
-      setSelectedCustomerIds(filteredCustomers.map(c => c.id));
+      setSelectedCustomerIds(filteredCustomers.map(c => c.clientId));
     }
   };
 
-  const handleToggleCustomer = (id: string) => {
+  const handleToggleCustomer = (clientId: string) => {
     setSelectedCustomerIds(prev => 
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+      prev.includes(clientId) ? prev.filter(x => x !== clientId) : [...prev, clientId]
     );
   };
 
@@ -101,7 +94,7 @@ export default function CustomersDirectory({
   const handleBulkDelete = async () => {
     if (selectedCustomerIds.length === 0) return;
     const count = selectedCustomerIds.length;
-    if (window.confirm(`هل أنت متأكد من حذف ${count} زبناء بجميع طلباتهم وسجلات خصاصهم نهائياً؟`)) {
+    if (window.confirm(`هل أنت متأكد من حذف ${count} طلبات زبناء نهائياً؟`)) {
       setIsDeletingBulk(true);
       try {
         if (onDeleteBulkCustomers) {
@@ -118,13 +111,6 @@ export default function CustomersDirectory({
     }
   };
 
-  const getWhatsAppLink = (name: string, phone: string) => {
-    let rawPhone = phone.replace(/\D/g, '');
-    if (rawPhone.startsWith('0')) rawPhone = '212' + rawPhone.slice(1);
-    const message = `السلام عليكم ورحمة الله وبركاته السيد(ة) ${name}،\n\nنواصل معكم من مكتبة وراقة اهل سوس لمتابعة خصاصاتكم.\nالهاتف: 0675502660`;
-    return `https://wa.me/${rawPhone}?text=${encodeURIComponent(message)}`;
-  };
-
   return (
     <div className="space-y-4">
       
@@ -134,7 +120,10 @@ export default function CustomersDirectory({
           <div className="w-9 h-9 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center font-bold shrink-0">
             <Users className="w-4.5 h-4.5" />
           </div>
-          <h2 className="text-base font-bold text-slate-900">دليل الزبناء</h2>
+          <div>
+            <h2 className="text-base font-bold text-slate-900">دليل الزبناء</h2>
+            <p className="text-[11px] text-slate-500">عرض جميع لوائح وخصاصات الزبناء بشكل منفصل ومستقل</p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 flex-col sm:flex-row w-full md:w-auto">
@@ -244,40 +233,24 @@ export default function CustomersDirectory({
                   </div>
                 )}
                 <span className="w-7 text-center">#</span>
-                <span>الزبون والترقيم</span>
+                <span>الزبون واللائحة</span>
               </div>
               <div className="w-44 text-right">رقم الهاتف (الواتساب)</div>
               <div className="flex-1 text-center">حالة الخصاص والاستلام</div>
-              <div className="w-48 text-left">الإجراءات الخيارات</div>
+              <div className="w-16 text-left">التفاصيل</div>
             </div>
 
             {/* Rows */}
             {filteredCustomers.map((cli, idx) => {
-              const customerDemands = demands.filter(d => d.client?.phone?.trim() === cli.phone);
-              const missingItems: { id: string; product_name: string; quantity: number }[] = [];
-              for (const dem of customerDemands) {
-                if (dem.items) {
-                  for (const it of dem.items) {
-                    if (!it.is_in_stock && !it.is_delivered) {
-                      missingItems.push({
-                        id: it.id,
-                        product_name: it.product_name,
-                        quantity: it.quantity,
-                      });
-                    }
-                  }
-                }
-              }
-              const missingCount = missingItems.length;
-              const isExpanded = expandedCustomerPhone === cli.phone;
-              const isSelected = selectedCustomerIds.includes(cli.id);
+              const isExpanded = expandedDemandId === cli.id;
+              const isSelected = selectedCustomerIds.includes(cli.clientId);
 
               return (
-                <div key={cli.phone} className={`group transition-colors ${isSelected ? 'bg-blue-50/50' : 'bg-white hover:bg-slate-50/80'}`}>
+                <div key={cli.id} className={`group transition-colors ${isSelected ? 'bg-blue-50/50' : 'bg-white hover:bg-slate-50/80'}`}>
                   
                   {/* Main Minimalist Compact Row */}
                   <div 
-                    onClick={() => setExpandedCustomerPhone(isExpanded ? null : cli.phone)}
+                    onClick={() => setExpandedDemandId(isExpanded ? null : cli.id)}
                     className="py-2.5 px-3 sm:py-3 sm:px-5 cursor-pointer flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 text-right select-none"
                   >
                     
@@ -291,7 +264,7 @@ export default function CustomersDirectory({
                               checked={isSelected}
                               onChange={(e) => {
                                 e.stopPropagation();
-                                handleToggleCustomer(cli.id);
+                                handleToggleCustomer(cli.clientId);
                               }}
                               className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
                               title="تحديد هذا الزبون"
@@ -304,10 +277,10 @@ export default function CustomersDirectory({
                         </span>
                         
                         <Link
-                          href={`/customers/${encodeURIComponent(cli.phone)}`}
+                          href={`/customers/${encodeURIComponent(cli.id)}`}
                           onClick={(e) => e.stopPropagation()}
                           className="font-extrabold text-slate-900 text-xs sm:text-sm hover:text-sky-700 hover:underline transition-colors truncate dir-rtl text-right"
-                          title="انقر لعرض ملف الزبون الكامل"
+                          title="انقر لعرض ملف هذه الطلبية بالكامل"
                         >
                           {cli.name}
                         </Link>
@@ -340,13 +313,17 @@ export default function CustomersDirectory({
                         <span className="bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black px-2 py-0.5 rounded">
                           {cli.totalItems} سلعة
                         </span>
-                        {missingCount > 0 ? (
+                        {cli.missingCount > 0 ? (
                           <span className="bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-black px-2 py-0.5 rounded">
-                            {missingCount} خصاص
+                            {cli.missingCount} خصاص
                           </span>
-                        ) : (
+                        ) : cli.isReady ? (
                           <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black px-2 py-0.5 rounded">
                             جاهز
+                          </span>
+                        ) : (
+                          <span className="bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-black px-2 py-0.5 rounded">
+                            مستلم
                           </span>
                         )}
                       </div>
@@ -358,12 +335,16 @@ export default function CustomersDirectory({
                         {cli.totalItems} سلعة
                       </span>
 
-                      {missingCount > 0 ? (
+                      {cli.missingCount > 0 ? (
                         <span className="bg-rose-50 text-rose-700 border border-rose-200 text-xs font-black px-2.5 py-0.5 rounded-md">
-                          {missingCount} خصاص
+                          {cli.missingCount} خصاص
+                        </span>
+                      ) : cli.isReady ? (
+                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-black px-2.5 py-0.5 rounded-md">
+                          جاهز للاستلام
                         </span>
                       ) : (
-                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-black px-2.5 py-0.5 rounded-md">
+                        <span className="bg-slate-100 text-slate-700 border border-slate-200 text-xs font-black px-2.5 py-0.5 rounded-md">
                           جميع طلباته مستلمة
                         </span>
                       )}
@@ -385,12 +366,12 @@ export default function CustomersDirectory({
                   {/* Pure Minimalist Inline Missing Items List */}
                   {isExpanded && (
                     <div className="bg-slate-50/90 border-t border-slate-200 px-4 py-2.5 space-y-1.5 animate-in fade-in duration-150 text-right">
-                      {missingItems.length === 0 ? (
+                      {cli.missingCount === 0 ? (
                         <div className="text-[11px] font-bold text-emerald-700 py-1">
-                          جميع طلبات هذا الزبون متوفرة بالمحل أو تم تسليمها بالكامل.
+                          جميع كتب هذه الطلبية متوفرة بالمحل أو تم تسليمها بالكامل.
                         </div>
                       ) : (
-                        missingItems.map((item) => (
+                        cli.missingItems.map((item) => (
                           <div key={item.id} className="flex items-center gap-2.5 py-1 border-b border-slate-200/50 last:border-0 text-xs">
                             <span className="w-6 h-6 rounded bg-slate-200/80 text-slate-800 font-black text-xs flex items-center justify-center shrink-0">
                               {item.quantity}

@@ -245,11 +245,8 @@ export async function createClientDemand(
       await addMasterProduct(item.product_name);
     }
 
-    let { data: existingClient } = await supabase.from('clients').select('*').eq('phone', cleanPhone).maybeSingle();
-    if (!existingClient) {
-      const { data: newCli } = await supabase.from('clients').insert({ name: cleanName, phone: cleanPhone }).select().single();
-      existingClient = newCli;
-    }
+    const { data: newCli } = await supabase.from('clients').insert({ name: cleanName, phone: cleanPhone }).select().single();
+    const existingClient = newCli;
 
     if (existingClient) {
       const { data: demand } = await supabase.from('client_demands').insert({ client_id: existingClient.id, batch_id: activeBatch.id, status: 'pending' }).select().single();
