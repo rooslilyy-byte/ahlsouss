@@ -366,18 +366,18 @@ export default function EditDemandModal({
           </div>
 
           {/* Sticky Bottom Actions Bar */}
-          <div className="sticky bottom-0 bg-white border-t border-slate-200 pt-3 flex items-center justify-end gap-3 z-10 -mx-4 -mb-4 p-4 sm:-mx-6 sm:-mb-6 sm:p-6 shadow-lg">
+          <div className="sticky bottom-0 bg-white border-t border-slate-200 pt-3 flex items-center justify-end gap-2.5 z-10 -mx-4 -mb-4 p-3.5 shadow-md">
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-h-[44px]"
+              className="px-4 h-9 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs sm:text-sm rounded-lg transition-colors border border-slate-200"
             >
               إلغاء
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold px-6 py-2.5 rounded-xl shadow-md flex items-center gap-2 transition-all disabled:opacity-50 min-h-[44px]"
+              className="bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs sm:text-sm h-9 px-4 rounded-lg shadow-sm flex items-center gap-1.5 transition-colors disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
               <span>{isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}</span>

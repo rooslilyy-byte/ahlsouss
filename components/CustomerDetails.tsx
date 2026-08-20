@@ -200,11 +200,12 @@ export default function CustomerDetails({
           </div>
         </div>
 
-        {/* 2. Top Action Buttons Bar (Mobile 2x2 Grid / Desktop Flex) */}
+        {/* 2. Top Action Buttons Bar */}
         <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
           
           {/* 1. Edit Demand */}
           <button
+            type="button"
             onClick={() => setIsEditing(true)}
             className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm px-3.5 h-9 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-sm"
           >
@@ -214,6 +215,7 @@ export default function CustomerDetails({
 
           {/* 2. Thermal Print Receipt */}
           <button
+            type="button"
             onClick={() => setIsPrinting(true)}
             className="bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs sm:text-sm px-3.5 h-9 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-sm"
           >
@@ -234,6 +236,7 @@ export default function CustomerDetails({
 
           {/* 4. Delete Demand */}
           <button
+            type="button"
             onClick={handleDelete}
             className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-xs sm:text-sm px-3.5 h-9 rounded-lg flex items-center justify-center gap-1.5 transition-colors"
           >

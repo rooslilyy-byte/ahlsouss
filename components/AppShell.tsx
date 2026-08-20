@@ -144,18 +144,32 @@ export default function AppShell({ children }: AppShellProps) {
   };
 
   const handleDeleteDemand = async (id: string) => {
+    // Optimistically filter out deleted demand
+    setDemands(prev => {
+      const next = prev.filter(d => d.id !== id && d.client?.id !== id);
+      globalAppCache.demands = next;
+      return next;
+    });
+
     await deleteClientDemand(id);
-    await loadData();
+    await loadData(true);
   };
 
   const handleDeleteBulkCustomers = async (clientIds: string[]) => {
+    // Optimistically filter out deleted clients
+    setDemands(prev => {
+      const next = prev.filter(d => d.client?.id && !clientIds.includes(d.client.id));
+      globalAppCache.demands = next;
+      return next;
+    });
+
     await deleteBulkCustomers(clientIds);
     await loadData(true);
   };
 
   const handleArchiveBatch = async (newBatchName: string) => {
     await archiveActiveBatch(newBatchName);
-    await loadData();
+    await loadData(true);
   };
 
   return (

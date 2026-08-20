@@ -27,16 +27,11 @@ let pendingStorePromise: Promise<FullStoreData> | null = null;
 export function invalidateStoreCache(): void {
   storeCache.data = null;
   storeCache.timestamp = 0;
+  pendingStorePromise = null;
 }
 
 export async function getFullStoreData(forceRefresh = false): Promise<FullStoreData> {
-  const now = Date.now();
-  // Return cached data if fresh (less than 3000ms old) and not forced
-  if (!forceRefresh && storeCache.data && (now - storeCache.timestamp < 3000)) {
-    return storeCache.data;
-  }
-
-  // If a request is already in-flight, re-use its promise to prevent duplicate requests
+  // Always fetch live data without caching
   if (pendingStorePromise) {
     return pendingStorePromise;
   }
@@ -44,7 +39,14 @@ export async function getFullStoreData(forceRefresh = false): Promise<FullStoreD
   pendingStorePromise = (async () => {
     try {
       if (isBrowser) {
-        const res = await fetch('/api/store', { method: 'GET', cache: 'no-store' });
+        const res = await fetch(`/api/store?t=${Date.now()}`, { 
+          method: 'GET', 
+          cache: 'no-store',
+          headers: { 
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          } 
+        });
         const data = await res.json();
         if (data.success) {
           const fullData: FullStoreData = {
@@ -68,25 +70,54 @@ export async function getFullStoreData(forceRefresh = false): Promise<FullStoreD
           .select('*')
           .eq('is_archived', false)
           .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-        if (bData) batch = bData;
+          .limit(1);
 
-        const { data: mpData } = await supabase
+        if (bData && bData.length > 0) {
+          batch = bData[0];
+        }
+
+        const { data: pData } = await supabase
           .from('master_products')
           .select('*')
           .order('name');
-        if (mpData) masterProducts = mpData;
+        if (pData) masterProducts = pData;
 
         const { data: dData } = await supabase
           .from('client_demands')
           .select(`
-            *,
-            client:clients(*),
-            items:demand_items(*)
+            id,
+            status,
+            created_at,
+            client:clients!inner (
+              id,
+              name,
+              phone
+            ),
+            items:demand_items (
+              id,
+              product_name,
+              quantity,
+              is_in_stock,
+              is_delivered
+            )
           `)
+          .eq('batch_id', batch.id)
           .order('created_at', { ascending: false });
-        if (dData) demands = dData as ClientDemand[];
+
+        if (dData) {
+          demands = dData.map((d: any) => ({
+            id: d.id,
+            client_id: d.client.id,
+            client: {
+              id: d.client.id,
+              name: d.client.name,
+              phone: d.client.phone,
+            },
+            status: d.status,
+            created_at: d.created_at,
+            items: d.items || [],
+          }));
+        }
       }
 
       const fullData: FullStoreData = { activeBatch: batch, masterProducts, demands };
@@ -101,9 +132,14 @@ export async function getFullStoreData(forceRefresh = false): Promise<FullStoreD
 }
 
 async function fetchStoreApi(action: string, payload: Record<string, any> = {}) {
-  const res = await fetch('/api/store', {
+  const res = await fetch(`/api/store?t=${Date.now()}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
+    headers: { 
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache'
+    },
     body: JSON.stringify({ action, ...payload }),
   });
   const data = await res.json();
