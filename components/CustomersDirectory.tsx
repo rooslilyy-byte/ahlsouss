@@ -25,6 +25,7 @@ export default function CustomersDirectory({
   onDeleteBulkCustomers,
   onSelectCustomer 
 }: CustomersDirectoryProps) {
+  const [filter, setFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedDemandId, setExpandedDemandId] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -64,11 +65,24 @@ export default function CustomersDirectory({
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [demands]);
 
-  const filteredCustomers = customerEntries.filter(c => 
-    !searchQuery.trim() ||
-    c.name.toLowerCase().includes(searchQuery.toLowerCase().trim()) ||
-    c.phone.includes(searchQuery.trim())
-  );
+  const filteredCustomers = customerEntries.filter(c => {
+    const matchesSearch = 
+      !searchQuery.trim() ||
+      c.name.toLowerCase().includes(searchQuery.toLowerCase().trim()) ||
+      c.phone.includes(searchQuery.trim());
+    if (!matchesSearch) return false;
+
+    if (filter === 'ready') {
+      return c.totalItems > 0 && c.missingCount === 0;
+    }
+    if (filter === 'partial') {
+      return c.missingCount > 0 && c.missingCount < c.totalItems;
+    }
+    if (filter === 'waiting') {
+      return c.totalItems > 0 && c.missingCount === c.totalItems;
+    }
+    return true;
+  });
 
   const isAllSelected = filteredCustomers.length > 0 && filteredCustomers.every(c => selectedCustomerIds.includes(c.clientId));
 
@@ -206,6 +220,29 @@ export default function CustomersDirectory({
           onCreateDemand={onCreateDemand}
         />
       )}
+
+      {/* Status Filter Buttons */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+        {[
+          { key: 'all', label: 'الكل' },
+          { key: 'ready', label: 'جاهز بالكامل' },
+          { key: 'partial', label: 'جاهز جزئياً' },
+          { key: 'waiting', label: 'في الانتظار' },
+        ].map((btn) => (
+          <button
+            key={btn.key}
+            type="button"
+            onClick={() => setFilter(btn.key)}
+            className={`h-9 px-4 text-sm font-medium rounded-lg transition-colors shrink-0 ${
+              filter === btn.key
+                ? 'bg-slate-900 text-white shadow-sm border border-slate-900'
+                : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+            }`}
+          >
+            {btn.label}
+          </button>
+        ))}
+      </div>
 
       {/* Compact Full-Width Customers Table */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden space-y-0">
