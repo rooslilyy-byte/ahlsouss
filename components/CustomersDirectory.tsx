@@ -222,7 +222,7 @@ export default function CustomersDirectory({
       )}
 
       {/* Status Filter Buttons */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+      <div className="flex flex-wrap items-center gap-2">
         {[
           { key: 'all', label: 'الكل' },
           { key: 'ready', label: 'جاهز بالكامل' },
@@ -233,7 +233,7 @@ export default function CustomersDirectory({
             key={btn.key}
             type="button"
             onClick={() => setFilter(btn.key)}
-            className={`h-9 px-4 text-sm font-medium rounded-lg transition-colors shrink-0 ${
+            className={`h-9 px-4 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
               filter === btn.key
                 ? 'bg-slate-900 text-white shadow-sm border border-slate-900'
                 : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:text-slate-900'
