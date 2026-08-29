@@ -343,7 +343,10 @@ export async function autoAllocateStock(
             !item.is_delivered
           ) {
             const needed = item.quantity;
-            const fulfilled = Math.min(remaining, needed);
+            if (remaining < needed) {
+              remaining = 0; // stop allocation
+              break;
+            }
 
             await supabase.from('demand_items').update({ is_in_stock: true }).eq('id', item.id);
             remaining -= needed;
@@ -352,7 +355,7 @@ export async function autoAllocateStock(
             if (!allocatedMap[key]) {
               allocatedMap[key] = { clientName: cli.name, phone: cli.phone, totalFulfilled: 0 };
             }
-            allocatedMap[key].totalFulfilled += fulfilled;
+            allocatedMap[key].totalFulfilled += needed;
           }
         }
       }

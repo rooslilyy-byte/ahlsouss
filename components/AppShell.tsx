@@ -120,14 +120,20 @@ export default function AppShell({ children }: AppShellProps) {
         new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
       );
 
+      let stopAllocation = false;
       const updated = sortedDemands.map(dem => {
-        if (!dem.items || remaining <= 0) return dem;
+        if (!dem.items || remaining <= 0 || stopAllocation) return dem;
         const newItems = dem.items.map(it => {
-          if (remaining <= 0) return it;
+          if (remaining <= 0 || stopAllocation) return it;
           if (it.product_name.trim().toLowerCase() === cleanName && !it.is_in_stock && !it.is_delivered) {
             const needed = it.quantity;
-            remaining -= needed;
-            return { ...it, is_in_stock: true };
+            if (remaining >= needed) {
+              remaining -= needed;
+              return { ...it, is_in_stock: true };
+            } else {
+              stopAllocation = true;
+              return it;
+            }
           }
           return it;
         });

@@ -162,8 +162,13 @@ export default function StockAllocation({
                 for (const it of dem.items) {
                   if (it.product_name.trim().toLowerCase() === productName.toLowerCase() && !it.is_in_stock && !it.is_delivered) {
                     const needed = it.quantity;
-                    await onUpdateItemState(it.id, { is_in_stock: true });
-                    remaining -= needed;
+                    if (remaining >= needed) {
+                      await onUpdateItemState(it.id, { is_in_stock: true });
+                      remaining -= needed;
+                    } else {
+                      remaining = 0;
+                      break;
+                    }
                   }
                 }
               }

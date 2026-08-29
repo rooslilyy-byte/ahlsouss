@@ -274,10 +274,12 @@ export async function POST(request: Request) {
         if (remainingQty <= 0) break;
 
         const needed = item.quantity;
-        const fulfilledPortion = Math.min(remainingQty, needed);
+        if (remainingQty < needed) {
+          // Insufficient stock to fulfill this item completely; leave as pending and stop allocating.
+          break;
+        }
 
-        // Strict Requirement: NEVER execute INSERT into demand_items.
-        // Update the is_in_stock boolean column on existing record.
+        // Fulfill item completely
         await query(
           `UPDATE public.demand_items SET is_in_stock = true WHERE id = $1;`,
           [item.item_id]
@@ -293,7 +295,7 @@ export async function POST(request: Request) {
             totalFulfilled: 0,
           };
         }
-        allocatedClientsMap[key].totalFulfilled += fulfilledPortion;
+        allocatedClientsMap[key].totalFulfilled += needed;
       }
 
       if (remainingQty > 0) {
