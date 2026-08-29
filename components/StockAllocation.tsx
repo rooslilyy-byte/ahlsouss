@@ -52,6 +52,8 @@ export default function StockAllocation({
     const map: Record<string, {
       productName: string;
       category: string;
+      totalDemanded: number;
+      totalFulfilled: number;
       totalMissingQty: number;
       availableStock: number;
       clients: { clientName: string; phone: string; quantity: number; demandCreatedAt: string }[];
@@ -60,35 +62,51 @@ export default function StockAllocation({
     for (const dem of demands) {
       if (!dem.items || !dem.client) continue;
       for (const item of dem.items) {
-        if (!item.is_in_stock && !item.is_delivered) {
+        if (!item.is_delivered) {
           const pName = item.product_name.trim();
-          if (!map[pName]) {
+          const key = pName.toLowerCase();
+          if (!map[key]) {
             const masterProd = masterProducts.find(
-              mp => mp.name.trim().toLowerCase() === pName.toLowerCase()
+              mp => mp.name.trim().toLowerCase() === key
             );
-            map[pName] = {
+            map[key] = {
               productName: pName,
               category: masterProd?.category || 'كتاب مدرسي',
+              totalDemanded: 0,
+              totalFulfilled: 0,
               totalMissingQty: 0,
               availableStock: masterProd?.available_stock || 0,
               clients: [],
             };
           }
-          map[pName].totalMissingQty += item.quantity;
-          map[pName].clients.push({
-            clientName: dem.client.name,
-            phone: dem.client.phone,
-            quantity: item.quantity,
-            demandCreatedAt: dem.created_at || new Date().toISOString(),
-          });
+
+          const qty = item.quantity || 0;
+          map[key].totalDemanded += qty;
+
+          if (item.is_in_stock) {
+            map[key].totalFulfilled += qty;
+          } else {
+            map[key].clients.push({
+              clientName: dem.client.name,
+              phone: dem.client.phone,
+              quantity: qty,
+              demandCreatedAt: dem.created_at || new Date().toISOString(),
+            });
+          }
         }
       }
     }
 
-    const list = Object.values(map).map(item => ({
-      ...item,
-      clients: item.clients.sort((a, b) => new Date(a.demandCreatedAt).getTime() - new Date(b.demandCreatedAt).getTime())
-    }));
+    const list = Object.values(map)
+      .map(item => {
+        const remainingNeed = item.totalDemanded - item.totalFulfilled;
+        return {
+          ...item,
+          totalMissingQty: remainingNeed,
+          clients: item.clients.sort((a, b) => new Date(a.demandCreatedAt).getTime() - new Date(b.demandCreatedAt).getTime())
+        };
+      })
+      .filter(item => item.totalMissingQty > 0);
 
     return list.sort((a, b) => b.totalMissingQty - a.totalMissingQty);
   }, [demands, masterProducts]);
