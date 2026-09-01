@@ -499,7 +499,10 @@ export async function updateClientDemand(
 }
 
 // --- AGGREGATED REPORT FOR SUPPLIERS (A4 PRINT) ---
-export async function getSupplierAggregatedReport(batchId?: string): Promise<SupplierAggregatedItem[]> {
+export async function getSupplierAggregatedReport(
+  batchId?: string,
+  statusFilter?: 'normal' | 'rupture'
+): Promise<SupplierAggregatedItem[]> {
   const demands = await getClientDemands(batchId);
   const itemMap: Record<string, {
     productName: string;
@@ -517,6 +520,10 @@ export async function getSupplierAggregatedReport(batchId?: string): Promise<Sup
 
     for (const item of dem.items) {
       if (item.is_delivered || item.is_in_stock) continue;
+
+      const isRupture = item.status === 'en_rupture';
+      if (statusFilter === 'normal' && isRupture) continue;
+      if (statusFilter === 'rupture' && !isRupture) continue;
 
       const pName = item.product_name.trim();
       if (!itemMap[pName]) {
