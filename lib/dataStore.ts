@@ -98,7 +98,8 @@ export async function getFullStoreData(forceRefresh = false): Promise<FullStoreD
               product_name,
               quantity,
               is_in_stock,
-              is_delivered
+              is_delivered,
+              status
             )
           `)
           .eq('batch_id', batch.id)
@@ -381,6 +382,43 @@ export async function autoAllocateStock(
   }
 
   return [];
+}
+
+export async function markProductEnRupture(productName: string): Promise<void> {
+  const cleanName = productName.trim();
+  if (isBrowser) {
+    await fetchStoreApi('mark_en_rupture', { productName: cleanName });
+    return;
+  }
+
+  if (isSupabaseConfigured) {
+    await supabase
+      .from('demand_items')
+      .update({ status: 'en_rupture' })
+      .ilike('product_name', cleanName)
+      .eq('is_in_stock', false)
+      .eq('is_delivered', false);
+    invalidateStoreCache();
+  }
+}
+
+export async function restoreProductEnRupture(productName: string): Promise<void> {
+  const cleanName = productName.trim();
+  if (isBrowser) {
+    await fetchStoreApi('restore_en_rupture', { productName: cleanName });
+    return;
+  }
+
+  if (isSupabaseConfigured) {
+    await supabase
+      .from('demand_items')
+      .update({ status: 'pending' })
+      .ilike('product_name', cleanName)
+      .eq('status', 'en_rupture')
+      .eq('is_in_stock', false)
+      .eq('is_delivered', false);
+    invalidateStoreCache();
+  }
 }
 
 export async function deleteClientDemand(demandId: string): Promise<void> {

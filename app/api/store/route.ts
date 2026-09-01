@@ -281,7 +281,7 @@ export async function POST(request: Request) {
 
         // Fulfill item completely
         await query(
-          `UPDATE public.demand_items SET is_in_stock = true WHERE id = $1;`,
+          `UPDATE public.demand_items SET is_in_stock = true, status = 'pending' WHERE id = $1;`,
           [item.item_id]
         );
 
@@ -321,6 +321,41 @@ export async function POST(request: Request) {
       });
 
       return NextResponse.json({ success: true, allocatedClients, surplusQty: remainingQty });
+    }
+
+    // --- MARK EN RUPTURE (Out of Stock) ---
+    if (action === 'mark_en_rupture') {
+      const { productName } = body;
+      const cleanName = productName.trim();
+
+      await query(
+        `UPDATE public.demand_items 
+         SET status = 'en_rupture' 
+         WHERE LOWER(TRIM(product_name)) = LOWER(TRIM($1)) 
+           AND is_in_stock = false 
+           AND is_delivered = false;`,
+        [cleanName]
+      );
+
+      return NextResponse.json({ success: true });
+    }
+
+    // --- RESTORE FROM RUPTURE ---
+    if (action === 'restore_en_rupture') {
+      const { productName } = body;
+      const cleanName = productName.trim();
+
+      await query(
+        `UPDATE public.demand_items 
+         SET status = 'pending' 
+         WHERE LOWER(TRIM(product_name)) = LOWER(TRIM($1)) 
+           AND status = 'en_rupture'
+           AND is_in_stock = false 
+           AND is_delivered = false;`,
+        [cleanName]
+      );
+
+      return NextResponse.json({ success: true });
     }
 
     // --- DELETE DEMAND ---

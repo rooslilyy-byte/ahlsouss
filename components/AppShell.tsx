@@ -13,7 +13,9 @@ import {
   updateDemandItemState, 
   deleteClientDemand,
   deleteBulkCustomers,
-  autoAllocateStock
+  autoAllocateStock,
+  markProductEnRupture,
+  restoreProductEnRupture
 } from '@/lib/dataStore';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { PurchaseBatch, MasterProduct, ClientDemand } from '@/lib/types';
@@ -44,6 +46,8 @@ export interface AppShellData {
   handleDeleteDemand: (id: string) => Promise<void>;
   handleDeleteBulkCustomers: (clientIds: string[]) => Promise<void>;
   handleArchiveBatch: (name: string) => Promise<void>;
+  handleMarkEnRupture: (productName: string) => Promise<void>;
+  handleRestoreEnRupture: (productName: string) => Promise<void>;
 }
 
 interface AppShellProps {
@@ -178,6 +182,48 @@ export default function AppShell({ children }: AppShellProps) {
     await loadData(true);
   };
 
+  const handleMarkEnRupture = async (productName: string) => {
+    const cleanName = productName.trim().toLowerCase();
+    // Optimistically mark items in state
+    setDemands(prev => {
+      const next = prev.map(dem => ({
+        ...dem,
+        items: dem.items?.map(it => {
+          if (it.product_name.trim().toLowerCase() === cleanName && !it.is_in_stock && !it.is_delivered) {
+            return { ...it, status: 'en_rupture' };
+          }
+          return it;
+        })
+      }));
+      globalAppCache.demands = next;
+      return next;
+    });
+
+    await markProductEnRupture(productName);
+    await loadData(true);
+  };
+
+  const handleRestoreEnRupture = async (productName: string) => {
+    const cleanName = productName.trim().toLowerCase();
+    // Optimistically restore items in state
+    setDemands(prev => {
+      const next = prev.map(dem => ({
+        ...dem,
+        items: dem.items?.map(it => {
+          if (it.product_name.trim().toLowerCase() === cleanName && it.status === 'en_rupture') {
+            return { ...it, status: 'pending' };
+          }
+          return it;
+        })
+      }));
+      globalAppCache.demands = next;
+      return next;
+    });
+
+    await restoreProductEnRupture(productName);
+    await loadData(true);
+  };
+
   return (
     <div className="min-h-[100dvh] bg-slate-50 flex font-cairo dir-rtl overflow-x-hidden" suppressHydrationWarning>
       <Sidebar isSupabaseActive={isSupabaseConfigured} />
@@ -203,6 +249,8 @@ export default function AppShell({ children }: AppShellProps) {
               handleDeleteDemand,
               handleDeleteBulkCustomers,
               handleArchiveBatch,
+              handleMarkEnRupture,
+              handleRestoreEnRupture,
             })
           )}
         </main>

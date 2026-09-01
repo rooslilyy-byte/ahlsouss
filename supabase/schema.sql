@@ -63,12 +63,14 @@ CREATE TABLE IF NOT EXISTS public.demand_items (
     quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
     is_in_stock BOOLEAN DEFAULT FALSE,
     is_delivered BOOLEAN DEFAULT FALSE,
+    status TEXT DEFAULT 'pending',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_demand_items_demand ON public.demand_items(demand_id);
 CREATE INDEX IF NOT EXISTS idx_demand_items_product ON public.demand_items(product_name);
 CREATE INDEX IF NOT EXISTS idx_demand_items_stock ON public.demand_items(is_in_stock, is_delivered);
+CREATE INDEX IF NOT EXISTS idx_demand_items_status ON public.demand_items(status);
 
 -- --------------------------------------------------------------------
 -- HELPER TRIGGER TO AUTOMATICALLY UPDATE CLIENT DEMAND STATUS
