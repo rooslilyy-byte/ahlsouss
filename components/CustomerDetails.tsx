@@ -15,7 +15,8 @@ import {
   AlertCircle, 
   BookOpen,
   CheckSquare, 
-  Square
+  Square,
+  Clock
 } from 'lucide-react';
 import { ClientDemand, MasterProduct } from '@/lib/types';
 import ThermalReceiptModal from './ThermalReceiptModal';
@@ -33,13 +34,14 @@ interface CustomerDetailsProps {
       id?: string;
       product_name: string;
       quantity: number;
+      fulfilled_quantity?: number;
       is_in_stock?: boolean;
       is_delivered?: boolean;
     }[]
   ) => Promise<void>;
   onUpdateItemState: (
     itemId: string, 
-    updates: { is_in_stock?: boolean; is_delivered?: boolean }
+    updates: { is_in_stock?: boolean; is_delivered?: boolean; fulfilled_quantity?: number }
   ) => Promise<void>;
   onDeleteDemand: (demandId: string) => Promise<void>;
 }
@@ -72,10 +74,11 @@ export default function CustomerDetails({
     const total = targetDemand.items.length;
     const inStock = targetDemand.items.filter(i => i.is_in_stock && !i.is_delivered).length;
     const delivered = targetDemand.items.filter(i => i.is_delivered).length;
+    const hasAnyPartial = targetDemand.items.some(i => !i.is_in_stock && !i.is_delivered && (i.fulfilled_quantity || 0) > 0);
     const missing = targetDemand.items.filter(i => !i.is_in_stock && !i.is_delivered).length;
     const isComplete = total > 0 && delivered === total;
     const isReady = !isComplete && total > 0 && (inStock + delivered) === total;
-    const isPartial = !isComplete && !isReady && (inStock + delivered) > 0;
+    const isPartial = !isComplete && !isReady && ((inStock + delivered) > 0 || hasAnyPartial);
 
     return { total, inStock, delivered, missing, isComplete, isReady, isPartial };
   }, [targetDemand]);
@@ -85,8 +88,11 @@ export default function CustomerDetails({
     let rawPhone = targetDemand.client.phone.replace(/\D/g, '');
     if (rawPhone.startsWith('0')) rawPhone = '212' + rawPhone.slice(1);
 
-    const readyItems = targetDemand.items?.filter(i => i.is_in_stock && !i.is_delivered) || [];
-    const readyText = readyItems.map(i => `- ${i.product_name} (${i.quantity})`).join('\n');
+    const readyItems = targetDemand.items?.filter(i => (i.is_in_stock || (i.fulfilled_quantity || 0) > 0) && !i.is_delivered) || [];
+    const readyText = readyItems.map(i => {
+      if (i.is_in_stock) return `- ${i.product_name} (${i.quantity} قطعة كاملة)`;
+      return `- ${i.product_name} (وصل منها: ${i.fulfilled_quantity} من أصل ${i.quantity} قطعة)`;
+    }).join('\n');
 
     const message = `السلام عليكم ورحمة الله وبركاته السيد(ة) ${targetDemand.client.name}،\n\nنخبركم من مكتبة وراقة اهل سوس أن الكتب والخصاصات التالية قد وصلت وتنتظر استلامكم:\n\n${readyText || 'جميع خصاصاتكم المسجلة جاهزة'}\n\nالعنوان: مكتبة وراقة اهل سوس\nالهاتف: 0675502660`;
 
@@ -266,6 +272,9 @@ export default function CustomerDetails({
           {targetDemand.items?.map((item, idx) => {
             const isInStock = item.is_in_stock;
             const isDelivered = item.is_delivered;
+            const fulfilledQty = item.fulfilled_quantity || 0;
+            const stillNeeded = Math.max(0, item.quantity - fulfilledQty);
+            const isPartiallyFulfilled = !isInStock && !isDelivered && fulfilledQty > 0 && stillNeeded > 0;
 
             return (
               <div
@@ -283,9 +292,20 @@ export default function CustomerDetails({
                     <h4 className="font-semibold text-slate-900 text-sm leading-tight truncate">
                       {item.product_name}
                     </h4>
-                    <p className="text-xs text-slate-500 font-normal mt-0.5">
-                      الكمية: <span className="font-semibold text-slate-800">{item.quantity} قطعة</span>
-                    </p>
+                    <div className="text-xs text-slate-500 font-normal mt-0.5 flex items-center gap-2 flex-wrap">
+                      <span>الكمية: <strong className="font-semibold text-slate-800">{item.quantity} قطعة</strong></span>
+                      {isPartiallyFulfilled && (
+                        <>
+                          <span className="text-slate-300">|</span>
+                          <span className="text-amber-800 font-medium bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/70">
+                            تم توفير: <strong className="font-bold text-amber-900">{fulfilledQty}</strong>
+                          </span>
+                          <span className="text-rose-700 font-semibold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200/70">
+                            المتبقي المطلوب: <strong className="font-black text-rose-900">{stillNeeded} قطعة</strong>
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -297,6 +317,11 @@ export default function CustomerDetails({
                     <span className="bg-emerald-50 text-emerald-700 text-[11px] font-medium px-2 py-0.5 rounded flex items-center gap-1 shrink-0">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                       <span>متوفر / جاهز</span>
+                    </span>
+                  ) : isPartiallyFulfilled ? (
+                    <span className="bg-amber-50 text-amber-800 text-[11px] font-semibold px-2 py-0.5 rounded flex items-center gap-1 shrink-0 border border-amber-200">
+                      <Clock className="w-3.5 h-3.5 text-amber-600" />
+                      <span>توفر جزئي ({fulfilledQty}/{item.quantity}) — متبقي {stillNeeded}</span>
                     </span>
                   ) : (
                     <span className="bg-rose-50 text-rose-700 text-[11px] font-medium px-2 py-0.5 rounded flex items-center gap-1 shrink-0">

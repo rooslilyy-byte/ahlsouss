@@ -97,6 +97,7 @@ export async function getFullStoreData(forceRefresh = false): Promise<FullStoreD
               id,
               product_name,
               quantity,
+              fulfilled_quantity,
               is_in_stock,
               is_delivered,
               status
@@ -230,7 +231,7 @@ export async function getClientDemands(batchId?: string, forceRefresh = false): 
 export async function createClientDemand(
   clientName: string,
   clientPhone: string,
-  items: { product_name: string; quantity: number }[]
+  items: { product_name: string; quantity: number; fulfilled_quantity?: number }[]
 ): Promise<ClientDemand | any> {
   if (isBrowser) {
     await fetchStoreApi('create_demand', { clientName, clientPhone, items });
@@ -277,10 +278,12 @@ export async function createClientDemand(
             }
           }
 
+          const fulfilledQty = isInStock ? qty : 0;
           await supabase.from('demand_items').insert({
             demand_id: demand.id,
             product_name: prodName,
             quantity: qty,
+            fulfilled_quantity: fulfilledQty,
             is_in_stock: isInStock,
             is_delivered: false,
           });
@@ -293,7 +296,7 @@ export async function createClientDemand(
 
 export async function updateDemandItemState(
   itemId: string,
-  updates: { is_in_stock?: boolean; is_delivered?: boolean }
+  updates: { is_in_stock?: boolean; is_delivered?: boolean; fulfilled_quantity?: number }
 ): Promise<void> {
   if (isBrowser) {
     await fetchStoreApi('update_item_state', { itemId, updates });
@@ -343,20 +346,26 @@ export async function autoAllocateStock(
             !item.is_in_stock &&
             !item.is_delivered
           ) {
-            const needed = item.quantity;
-            if (remaining < needed) {
-              remaining = 0; // stop allocation
-              break;
-            }
-
-            await supabase.from('demand_items').update({ is_in_stock: true }).eq('id', item.id);
-            remaining -= needed;
+            const currentFulfilled = item.fulfilled_quantity || 0;
+            const stillNeeded = Math.max(0, item.quantity - currentFulfilled);
+            if (stillNeeded <= 0) continue;
 
             const key = cli.phone;
             if (!allocatedMap[key]) {
               allocatedMap[key] = { clientName: cli.name, phone: cli.phone, totalFulfilled: 0 };
             }
-            allocatedMap[key].totalFulfilled += needed;
+
+            if (remaining < stillNeeded) {
+              const newFulfilled = currentFulfilled + remaining;
+              await supabase.from('demand_items').update({ fulfilled_quantity: newFulfilled, is_in_stock: false }).eq('id', item.id);
+              allocatedMap[key].totalFulfilled += remaining;
+              remaining = 0;
+              break;
+            } else {
+              await supabase.from('demand_items').update({ fulfilled_quantity: item.quantity, is_in_stock: true }).eq('id', item.id);
+              allocatedMap[key].totalFulfilled += stillNeeded;
+              remaining -= stillNeeded;
+            }
           }
         }
       }
@@ -456,6 +465,7 @@ export async function updateClientDemand(
     id?: string;
     product_name: string;
     quantity: number;
+    fulfilled_quantity?: number;
     is_in_stock?: boolean;
     is_delivered?: boolean;
   }[]
@@ -487,10 +497,27 @@ export async function updateClientDemand(
 
       for (const item of items) {
         const validQty = Math.max(1, Math.floor(item.quantity || 1));
+        const fulfilled = item.fulfilled_quantity !== undefined 
+          ? Math.min(validQty, Math.max(0, item.fulfilled_quantity)) 
+          : (item.is_in_stock || item.is_delivered ? validQty : 0);
+
         if (item.id) {
-          await supabase.from('demand_items').update({ product_name: item.product_name.trim(), quantity: validQty, is_in_stock: item.is_in_stock ?? false, is_delivered: item.is_delivered ?? false }).eq('id', item.id);
+          await supabase.from('demand_items').update({ 
+            product_name: item.product_name.trim(), 
+            quantity: validQty, 
+            fulfilled_quantity: fulfilled,
+            is_in_stock: item.is_in_stock ?? false, 
+            is_delivered: item.is_delivered ?? false 
+          }).eq('id', item.id);
         } else {
-          await supabase.from('demand_items').insert({ demand_id: demandId, product_name: item.product_name.trim(), quantity: validQty, is_in_stock: item.is_in_stock ?? false, is_delivered: item.is_delivered ?? false });
+          await supabase.from('demand_items').insert({ 
+            demand_id: demandId, 
+            product_name: item.product_name.trim(), 
+            quantity: validQty, 
+            fulfilled_quantity: fulfilled,
+            is_in_stock: item.is_in_stock ?? false, 
+            is_delivered: item.is_delivered ?? false 
+          });
         }
       }
     }
@@ -525,6 +552,9 @@ export async function getSupplierAggregatedReport(
       if (statusFilter === 'normal' && isRupture) continue;
       if (statusFilter === 'rupture' && !isRupture) continue;
 
+      const stillNeeded = Math.max(0, item.quantity - (item.fulfilled_quantity || 0));
+      if (stillNeeded <= 0) continue;
+
       const pName = item.product_name.trim();
       if (!itemMap[pName]) {
         itemMap[pName] = {
@@ -534,11 +564,11 @@ export async function getSupplierAggregatedReport(
         };
       }
 
-      itemMap[pName].totalQuantity += item.quantity;
+      itemMap[pName].totalQuantity += stillNeeded;
       itemMap[pName].clients.push({
         clientName: dem.client.name,
         phone: dem.client.phone,
-        quantity: item.quantity,
+        quantity: stillNeeded,
         demandId: dem.id,
       });
     }

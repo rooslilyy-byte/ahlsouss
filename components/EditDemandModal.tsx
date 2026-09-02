@@ -31,6 +31,7 @@ interface EditDemandModalProps {
       id?: string;
       product_name: string;
       quantity: number;
+      fulfilled_quantity?: number;
       is_in_stock?: boolean;
       is_delivered?: boolean;
     }[]
@@ -50,6 +51,7 @@ export default function EditDemandModal({
       id?: string;
       product_name: string;
       quantity: number;
+      fulfilled_quantity?: number;
       is_in_stock: boolean;
       is_delivered: boolean;
     }[]
@@ -65,6 +67,7 @@ export default function EditDemandModal({
           id: it.id,
           product_name: it.product_name,
           quantity: it.quantity,
+          fulfilled_quantity: it.fulfilled_quantity,
           is_in_stock: it.is_in_stock,
           is_delivered: it.is_delivered,
         }))

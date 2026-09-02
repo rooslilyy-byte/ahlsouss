@@ -61,11 +61,15 @@ CREATE TABLE IF NOT EXISTS public.demand_items (
     demand_id UUID NOT NULL REFERENCES public.client_demands(id) ON DELETE CASCADE,
     product_name TEXT NOT NULL,
     quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+    fulfilled_quantity INTEGER NOT NULL DEFAULT 0 CHECK (fulfilled_quantity >= 0),
     is_in_stock BOOLEAN DEFAULT FALSE,
     is_delivered BOOLEAN DEFAULT FALSE,
     status TEXT DEFAULT 'pending',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Ensure fulfilled_quantity column exists if table already created
+ALTER TABLE public.demand_items ADD COLUMN IF NOT EXISTS fulfilled_quantity INTEGER NOT NULL DEFAULT 0 CHECK (fulfilled_quantity >= 0);
 
 CREATE INDEX IF NOT EXISTS idx_demand_items_demand ON public.demand_items(demand_id);
 CREATE INDEX IF NOT EXISTS idx_demand_items_product ON public.demand_items(product_name);

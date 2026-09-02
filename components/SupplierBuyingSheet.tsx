@@ -61,6 +61,9 @@ export default function SupplierBuyingSheet({
       for (const item of dem.items) {
         if (item.is_delivered || item.is_in_stock) continue;
 
+        const stillNeeded = Math.max(0, item.quantity - (item.fulfilled_quantity || 0));
+        if (stillNeeded <= 0) continue;
+
         const isRupture = item.status === 'en_rupture';
         const targetMap = isRupture ? ruptureMap : normalMap;
 
@@ -73,11 +76,11 @@ export default function SupplierBuyingSheet({
           };
         }
 
-        targetMap[pName].totalQuantity += item.quantity;
+        targetMap[pName].totalQuantity += stillNeeded;
         targetMap[pName].clients.push({
           clientName: dem.client.name,
           phone: dem.client.phone,
-          quantity: item.quantity,
+          quantity: stillNeeded,
           demandId: dem.id,
         });
       }

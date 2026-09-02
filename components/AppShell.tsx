@@ -99,12 +99,23 @@ export default function AppShell({ children }: AppShellProps) {
     await loadData(true);
   };
 
-  const handleUpdateItemState = async (itemId: string, updates: { is_in_stock?: boolean; is_delivered?: boolean }) => {
+  const handleUpdateItemState = async (itemId: string, updates: { is_in_stock?: boolean; is_delivered?: boolean; fulfilled_quantity?: number }) => {
     // Optimistic item update
     setDemands(prev => {
       const next = prev.map(dem => ({
         ...dem,
-        items: dem.items?.map(it => it.id === itemId ? { ...it, ...updates } : it)
+        items: dem.items?.map(it => {
+          if (it.id !== itemId) return it;
+          let newFulfilled = it.fulfilled_quantity;
+          if (updates.is_in_stock === true || updates.is_delivered === true) {
+            newFulfilled = it.quantity;
+          } else if (updates.is_in_stock === false && updates.fulfilled_quantity === undefined) {
+            newFulfilled = 0;
+          } else if (updates.fulfilled_quantity !== undefined) {
+            newFulfilled = updates.fulfilled_quantity;
+          }
+          return { ...it, ...updates, fulfilled_quantity: newFulfilled };
+        })
       }));
       globalAppCache.demands = next;
       return next;
@@ -115,7 +126,7 @@ export default function AppShell({ children }: AppShellProps) {
   };
 
   const handleAutoAllocateStock = async (productName: string, receivedQty: number) => {
-    // OPTIMISTIC LOCAL ALLOCATION UPDATE
+    // OPTIMISTIC LOCAL ALLOCATION UPDATE (Progressive Fulfillment)
     const cleanName = productName.trim().toLowerCase();
     let remaining = Math.max(1, Math.floor(receivedQty));
 
@@ -130,13 +141,18 @@ export default function AppShell({ children }: AppShellProps) {
         const newItems = dem.items.map(it => {
           if (remaining <= 0 || stopAllocation) return it;
           if (it.product_name.trim().toLowerCase() === cleanName && !it.is_in_stock && !it.is_delivered) {
-            const needed = it.quantity;
-            if (remaining >= needed) {
-              remaining -= needed;
-              return { ...it, is_in_stock: true };
-            } else {
+            const currentFulfilled = it.fulfilled_quantity || 0;
+            const stillNeeded = Math.max(0, it.quantity - currentFulfilled);
+            if (stillNeeded <= 0) return it;
+
+            if (remaining < stillNeeded) {
+              const newFulfilled = currentFulfilled + remaining;
+              remaining = 0;
               stopAllocation = true;
-              return it;
+              return { ...it, fulfilled_quantity: newFulfilled, is_in_stock: false };
+            } else {
+              remaining -= stillNeeded;
+              return { ...it, fulfilled_quantity: it.quantity, is_in_stock: true };
             }
           }
           return it;

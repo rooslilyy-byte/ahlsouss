@@ -42,13 +42,14 @@ interface DemandsListProps {
       id?: string;
       product_name: string;
       quantity: number;
+      fulfilled_quantity?: number;
       is_in_stock?: boolean;
       is_delivered?: boolean;
     }[]
   ) => Promise<void>;
   onUpdateItemState: (
     itemId: string, 
-    updates: { is_in_stock?: boolean; is_delivered?: boolean }
+    updates: { is_in_stock?: boolean; is_delivered?: boolean; fulfilled_quantity?: number }
   ) => Promise<void>;
   onDeleteDemand: (demandId: string) => Promise<void>;
   initialSearchQuery?: string;
@@ -466,19 +467,34 @@ export default function DemandsList({
                           جميع طلبات هذا الزبون متوفرة بالمحل أو تم تسليمها بالكامل.
                         </div>
                       ) : (
-                        missingItems.map((item) => (
-                          <div key={item.id} className="flex items-center gap-2.5 py-1 border-b border-slate-200/50 last:border-0 text-xs">
-                            <span className="w-6 h-6 rounded bg-slate-200/80 text-slate-800 font-black text-xs flex items-center justify-center shrink-0">
-                              {item.quantity}
-                            </span>
-                            <span className="bg-rose-100 text-rose-800 text-[10px] font-black px-2 py-0.5 rounded shrink-0 border border-rose-200">
-                              خصاص
-                            </span>
-                            <span className="font-extrabold text-slate-900 text-xs truncate">
-                              {item.product_name}
-                            </span>
-                          </div>
-                        ))
+                        missingItems.map((item) => {
+                          const fulfilledQty = item.fulfilled_quantity || 0;
+                          const stillNeeded = Math.max(0, item.quantity - fulfilledQty);
+                          const isPartial = fulfilledQty > 0 && stillNeeded > 0;
+
+                          return (
+                            <div key={item.id} className="flex items-center gap-2.5 py-1 border-b border-slate-200/50 last:border-0 text-xs">
+                              <span 
+                                className="w-6 h-6 rounded bg-slate-200/80 text-slate-800 font-black text-xs flex items-center justify-center shrink-0"
+                                title={isPartial ? `المتبقي: ${stillNeeded} من أصل ${item.quantity}` : `الكمية: ${item.quantity}`}
+                              >
+                                {isPartial ? stillNeeded : item.quantity}
+                              </span>
+                              {isPartial ? (
+                                <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded shrink-0 border border-amber-200">
+                                  باقي {stillNeeded} (من {item.quantity})
+                                </span>
+                              ) : (
+                                <span className="bg-rose-100 text-rose-800 text-[10px] font-black px-2 py-0.5 rounded shrink-0 border border-rose-200">
+                                  خصاص
+                                </span>
+                              )}
+                              <span className="font-extrabold text-slate-900 text-xs truncate">
+                                {item.product_name}
+                              </span>
+                            </div>
+                          );
+                        })
                       )}
                     </div>
                   )}

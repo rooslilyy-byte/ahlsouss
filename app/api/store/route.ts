@@ -132,9 +132,11 @@ export async function POST(request: Request) {
 
         const currentAvailable = prodRows[0]?.available_stock || 0;
         let isInStock = false;
+        let fulfilledQty = 0;
 
         if (currentAvailable >= qty) {
           isInStock = true;
+          fulfilledQty = qty;
           // Deduct allocated stock from master_products
           await query(
             `UPDATE public.master_products 
@@ -145,9 +147,9 @@ export async function POST(request: Request) {
         }
 
         await query(
-          `INSERT INTO public.demand_items (demand_id, product_name, quantity, is_in_stock, is_delivered)
-           VALUES ($1, $2, $3, $4, false);`,
-          [demandId, prodName, qty, isInStock]
+          `INSERT INTO public.demand_items (demand_id, product_name, quantity, fulfilled_quantity, is_in_stock, is_delivered)
+           VALUES ($1, $2, $3, $4, $5, false);`,
+          [demandId, prodName, qty, fulfilledQty, isInStock]
         );
       }
 
@@ -189,18 +191,22 @@ export async function POST(request: Request) {
           [prodName]
         );
 
+        const fulfilled = it.fulfilled_quantity !== undefined 
+          ? Math.min(qty, Math.max(0, parseInt(it.fulfilled_quantity) || 0))
+          : (inStock || delivered ? qty : 0);
+
         if (it.id) {
           await query(
             `UPDATE public.demand_items 
-             SET product_name = $1, quantity = $2, is_in_stock = $3, is_delivered = $4 
-             WHERE id = $5;`,
-            [prodName, qty, inStock, delivered, it.id]
+             SET product_name = $1, quantity = $2, fulfilled_quantity = $3, is_in_stock = $4, is_delivered = $5 
+             WHERE id = $6;`,
+            [prodName, qty, fulfilled, inStock, delivered, it.id]
           );
         } else {
           await query(
-            `INSERT INTO public.demand_items (demand_id, product_name, quantity, is_in_stock, is_delivered)
-             VALUES ($1, $2, $3, $4, $5);`,
-            [demandId, prodName, qty, inStock, delivered]
+            `INSERT INTO public.demand_items (demand_id, product_name, quantity, fulfilled_quantity, is_in_stock, is_delivered)
+             VALUES ($1, $2, $3, $4, $5, $6);`,
+            [demandId, prodName, qty, fulfilled, inStock, delivered]
           );
         }
       }
@@ -211,29 +217,56 @@ export async function POST(request: Request) {
     // --- UPDATE ITEM STATE (Stock Allocation / Delivery) ---
     if (action === 'update_item_state') {
       const { itemId, updates } = body;
-      const { is_in_stock, is_delivered } = updates;
+      const { is_in_stock, is_delivered, fulfilled_quantity } = updates;
 
       if (is_in_stock !== undefined && is_delivered !== undefined) {
         await query(
-          `UPDATE public.demand_items SET is_in_stock = $1, is_delivered = $2 WHERE id = $3;`,
-          [Boolean(is_in_stock), Boolean(is_delivered), itemId]
+          `UPDATE public.demand_items 
+           SET is_in_stock = $1, 
+               is_delivered = $2, 
+               fulfilled_quantity = CASE 
+                 WHEN $1 = true OR $2 = true THEN quantity 
+                 WHEN $4::integer IS NOT NULL THEN $4::integer 
+                 ELSE 0 
+               END 
+           WHERE id = $3;`,
+          [Boolean(is_in_stock), Boolean(is_delivered), itemId, fulfilled_quantity ?? null]
         );
       } else if (is_in_stock !== undefined) {
         await query(
-          `UPDATE public.demand_items SET is_in_stock = $1 WHERE id = $2;`,
-          [Boolean(is_in_stock), itemId]
+          `UPDATE public.demand_items 
+           SET is_in_stock = $1, 
+               fulfilled_quantity = CASE 
+                 WHEN $1 = true THEN quantity 
+                 WHEN $3::integer IS NOT NULL THEN $3::integer 
+                 ELSE 0 
+               END 
+           WHERE id = $2;`,
+          [Boolean(is_in_stock), itemId, fulfilled_quantity ?? null]
         );
       } else if (is_delivered !== undefined) {
         await query(
-          `UPDATE public.demand_items SET is_delivered = $1, is_in_stock = CASE WHEN $1 = true THEN true ELSE is_in_stock END WHERE id = $2;`,
+          `UPDATE public.demand_items 
+           SET is_delivered = $1, 
+               is_in_stock = CASE WHEN $1 = true THEN true ELSE is_in_stock END,
+               fulfilled_quantity = CASE WHEN $1 = true THEN quantity ELSE fulfilled_quantity END
+           WHERE id = $2;`,
           [Boolean(is_delivered), itemId]
+        );
+      } else if (fulfilled_quantity !== undefined) {
+        await query(
+          `UPDATE public.demand_items 
+           SET fulfilled_quantity = $1, 
+               is_in_stock = CASE WHEN $1 >= quantity THEN true ELSE false END 
+           WHERE id = $2;`,
+          [Math.max(0, parseInt(fulfilled_quantity) || 0), itemId]
         );
       }
 
       return NextResponse.json({ success: true });
     }
 
-    // --- AUTO ALLOCATE STOCK (FIFO Multi-Client) ---
+    // --- AUTO ALLOCATE STOCK (FIFO Multi-Client Progressive Fulfillment) ---
     if (action === 'auto_allocate_stock') {
       const { productName, receivedQty } = body;
       const cleanName = productName.trim();
@@ -252,6 +285,7 @@ export async function POST(request: Request) {
           di.demand_id,
           di.product_name,
           di.quantity,
+          COALESCE(di.fulfilled_quantity, 0) AS fulfilled_quantity,
           di.is_in_stock,
           di.is_delivered,
           cd.created_at AS demand_created_at,
@@ -273,19 +307,17 @@ export async function POST(request: Request) {
       for (const item of pendingItems) {
         if (remainingQty <= 0) break;
 
-        const needed = item.quantity;
-        if (remainingQty < needed) {
-          // Insufficient stock to fulfill this item completely; leave as pending and stop allocating.
-          break;
+        const currentFulfilled = Math.max(0, parseInt(item.fulfilled_quantity) || 0);
+        const itemQuantity = Math.max(1, parseInt(item.quantity) || 1);
+        const stillNeeded = Math.max(0, itemQuantity - currentFulfilled);
+
+        if (stillNeeded <= 0) {
+          await query(
+            `UPDATE public.demand_items SET is_in_stock = true, fulfilled_quantity = quantity, status = 'pending' WHERE id = $1;`,
+            [item.item_id]
+          );
+          continue;
         }
-
-        // Fulfill item completely
-        await query(
-          `UPDATE public.demand_items SET is_in_stock = true, status = 'pending' WHERE id = $1;`,
-          [item.item_id]
-        );
-
-        remainingQty -= needed;
 
         const key = item.client_phone;
         if (!allocatedClientsMap[key]) {
@@ -295,7 +327,32 @@ export async function POST(request: Request) {
             totalFulfilled: 0,
           };
         }
-        allocatedClientsMap[key].totalFulfilled += needed;
+
+        if (remainingQty < stillNeeded) {
+          // Partial progressive fulfillment: add incoming stock to fulfilled_quantity without splitting the row
+          const newFulfilled = currentFulfilled + remainingQty;
+          await query(
+            `UPDATE public.demand_items 
+             SET fulfilled_quantity = $1, is_in_stock = false, status = 'pending' 
+             WHERE id = $2;`,
+            [newFulfilled, item.item_id]
+          );
+
+          allocatedClientsMap[key].totalFulfilled += remainingQty;
+          remainingQty = 0;
+          break;
+        } else {
+          // Full fulfillment for this item: set fulfilled_quantity = quantity, is_in_stock = true
+          await query(
+            `UPDATE public.demand_items 
+             SET fulfilled_quantity = quantity, is_in_stock = true, status = 'pending' 
+             WHERE id = $1;`,
+            [item.item_id]
+          );
+
+          allocatedClientsMap[key].totalFulfilled += stillNeeded;
+          remainingQty -= stillNeeded;
+        }
       }
 
       if (remainingQty > 0) {

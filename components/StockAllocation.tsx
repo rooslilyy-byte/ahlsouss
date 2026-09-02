@@ -34,7 +34,7 @@ interface StockAllocationProps {
   masterProducts: MasterProduct[];
   onUpdateItemState: (
     itemId: string, 
-    updates: { is_in_stock?: boolean; is_delivered?: boolean }
+    updates: { is_in_stock?: boolean; is_delivered?: boolean; fulfilled_quantity?: number }
   ) => Promise<void>;
   onAutoAllocateStock?: (
     productName: string, 
@@ -86,6 +86,11 @@ export default function StockAllocation({
           const isRupture = item.status === 'en_rupture';
           const targetMap = isRupture ? ruptureMap : normalMap;
 
+          const fulfilledQty = item.fulfilled_quantity || 0;
+          const stillNeeded = Math.max(0, (item.quantity || 0) - fulfilledQty);
+
+          if (stillNeeded <= 0) continue;
+
           if (!targetMap[key]) {
             const masterProd = masterProducts.find(
               mp => mp.name.trim().toLowerCase() === key
@@ -105,13 +110,14 @@ export default function StockAllocation({
 
           const qty = item.quantity || 0;
           targetMap[key].totalDemanded += qty;
-          targetMap[key].totalMissingQty += qty;
+          targetMap[key].totalFulfilled += fulfilledQty;
+          targetMap[key].totalMissingQty += stillNeeded;
 
           const createdAt = dem.created_at || new Date().toISOString();
           targetMap[key].clients.push({
             clientName: dem.client.name,
             phone: dem.client.phone,
-            quantity: qty,
+            quantity: stillNeeded,
             demandCreatedAt: createdAt,
           });
 
@@ -273,13 +279,17 @@ export default function StockAllocation({
               if (dem.client?.phone === cli.phone && dem.items) {
                 for (const it of dem.items) {
                   if (it.product_name.trim().toLowerCase() === productName.toLowerCase() && !it.is_in_stock && !it.is_delivered) {
-                    const needed = it.quantity;
-                    if (remaining >= needed) {
-                      await onUpdateItemState(it.id, { is_in_stock: true });
-                      remaining -= needed;
-                    } else {
+                    const currentFulfilled = it.fulfilled_quantity || 0;
+                    const needed = Math.max(0, it.quantity - currentFulfilled);
+                    if (needed <= 0) continue;
+
+                    if (remaining < needed) {
+                      await onUpdateItemState(it.id, { is_in_stock: false, fulfilled_quantity: currentFulfilled + remaining });
                       remaining = 0;
                       break;
+                    } else {
+                      await onUpdateItemState(it.id, { is_in_stock: true, fulfilled_quantity: it.quantity });
+                      remaining -= needed;
                     }
                   }
                 }

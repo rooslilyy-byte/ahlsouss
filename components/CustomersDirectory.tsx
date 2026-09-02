@@ -43,8 +43,10 @@ export default function CustomersDirectory({
         const deliveredItems = items.filter(i => i.is_delivered).length;
         const missingItems = items.filter(i => !i.is_in_stock && !i.is_delivered);
         const inStockItems = items.filter(i => i.is_in_stock && !i.is_delivered).length;
+        const hasPartialItems = items.some(i => !i.is_in_stock && !i.is_delivered && (i.fulfilled_quantity || 0) > 0);
         const isComplete = totalItems > 0 && deliveredItems === totalItems;
         const isReady = !isComplete && totalItems > 0 && (inStockItems + deliveredItems) === totalItems;
+        const isPartial = !isComplete && !isReady && ((inStockItems + deliveredItems) > 0 || hasPartialItems);
 
         return {
           id: dem.id,
@@ -60,6 +62,7 @@ export default function CustomersDirectory({
           missingCount: missingItems.length,
           isComplete,
           isReady,
+          isPartial,
         };
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -76,10 +79,10 @@ export default function CustomersDirectory({
       return c.totalItems > 0 && c.missingCount === 0;
     }
     if (filter === 'partial') {
-      return c.missingCount > 0 && c.missingCount < c.totalItems;
+      return c.isPartial;
     }
     if (filter === 'waiting') {
-      return c.totalItems > 0 && c.missingCount === c.totalItems;
+      return !c.isReady && !c.isPartial && !c.isComplete;
     }
     return true;
   });
@@ -408,19 +411,34 @@ export default function CustomersDirectory({
                           جميع كتب هذه الطلبية متوفرة بالمحل أو تم تسليمها بالكامل.
                         </div>
                       ) : (
-                        cli.missingItems.map((item) => (
-                          <div key={item.id} className="flex items-center gap-2.5 py-1 border-b border-slate-200/50 last:border-0 text-xs">
-                            <span className="w-6 h-6 rounded bg-slate-200/80 text-slate-800 font-black text-xs flex items-center justify-center shrink-0">
-                              {item.quantity}
-                            </span>
-                            <span className="bg-rose-100 text-rose-800 text-[10px] font-black px-2 py-0.5 rounded shrink-0 border border-rose-200">
-                              خصاص
-                            </span>
-                            <span className="font-extrabold text-slate-900 text-xs truncate">
-                              {item.product_name}
-                            </span>
-                          </div>
-                        ))
+                        cli.missingItems.map((item) => {
+                          const fulfilledQty = item.fulfilled_quantity || 0;
+                          const stillNeeded = Math.max(0, item.quantity - fulfilledQty);
+                          const isPartial = fulfilledQty > 0 && stillNeeded > 0;
+
+                          return (
+                            <div key={item.id} className="flex items-center gap-2.5 py-1 border-b border-slate-200/50 last:border-0 text-xs">
+                              <span 
+                                className="w-6 h-6 rounded bg-slate-200/80 text-slate-800 font-black text-xs flex items-center justify-center shrink-0"
+                                title={isPartial ? `المتبقي: ${stillNeeded} من أصل ${item.quantity}` : `الكمية: ${item.quantity}`}
+                              >
+                                {isPartial ? stillNeeded : item.quantity}
+                              </span>
+                              {isPartial ? (
+                                <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded shrink-0 border border-amber-200">
+                                  باقي {stillNeeded} (من {item.quantity})
+                                </span>
+                              ) : (
+                                <span className="bg-rose-100 text-rose-800 text-[10px] font-black px-2 py-0.5 rounded shrink-0 border border-rose-200">
+                                  خصاص
+                                </span>
+                              )}
+                              <span className="font-extrabold text-slate-900 text-xs truncate">
+                                {item.product_name}
+                              </span>
+                            </div>
+                          );
+                        })
                       )}
                     </div>
                   )}
