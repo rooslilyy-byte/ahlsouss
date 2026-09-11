@@ -179,20 +179,8 @@ export async function addMasterProduct(name: string, category: string = 'كتا�
 }
 
 export async function updateMasterProductStock(productName: string, deltaQty: number): Promise<void> {
-  const trimmed = productName.trim();
-  if (isBrowser) {
-    await fetchStoreApi('update_stock', { productName: trimmed, deltaQty });
-    return;
-  }
-
-  if (isSupabaseConfigured) {
-    const { data } = await supabase.from('master_products').select('id, available_stock').eq('name', trimmed).maybeSingle();
-    if (data) {
-      const current = data.available_stock || 0;
-      await supabase.from('master_products').update({ available_stock: Math.max(0, current + deltaQty) }).eq('id', data.id);
-    }
-    invalidateStoreCache();
-  }
+  // Pure demand tracker: surplus stock is discarded and positive balances are not tracked
+  return;
 }
 
 // --- BATCHES ---
@@ -257,35 +245,14 @@ export async function createClientDemand(
           const prodName = it.product_name.trim();
           const qty = Math.max(1, Math.floor(it.quantity || 1));
 
-          // Check stock
-          const { data: masterProd } = await supabase
-            .from('master_products')
-            .select('*')
-            .ilike('name', prodName)
-            .maybeSingle();
-
-          const available = masterProd?.available_stock || 0;
-          let isInStock = false;
-
-          if (available >= qty) {
-            isInStock = true;
-            // Decrement available stock
-            if (masterProd?.id) {
-              await supabase
-                .from('master_products')
-                .update({ available_stock: available - qty })
-                .eq('id', masterProd.id);
-            }
-          }
-
-          const fulfilledQty = isInStock ? qty : 0;
           await supabase.from('demand_items').insert({
             demand_id: demand.id,
             product_name: prodName,
             quantity: qty,
-            fulfilled_quantity: fulfilledQty,
-            is_in_stock: isInStock,
+            fulfilled_quantity: 0,
+            is_in_stock: false,
             is_delivered: false,
+            status: 'pending',
           });
         }
       }
@@ -371,10 +338,7 @@ export async function autoAllocateStock(
       }
     }
 
-    if (remaining > 0) {
-      await updateMasterProductStock(cleanName, remaining);
-    }
-
+    // Surplus is discarded (pure demand tracker)
     invalidateStoreCache();
 
     return Object.values(allocatedMap).map(c => {

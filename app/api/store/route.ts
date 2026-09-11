@@ -113,43 +113,22 @@ export async function POST(request: Request) {
       );
       const demandId = demandRows[0].id;
 
-      // 4. Insert demand items in public.demand_items with auto-fulfillment if available_stock >= requested_quantity
+      // 4. Insert demand items in public.demand_items (Pure Pending Demand Tracker: Always unfulfilled on creation)
       for (const it of items) {
         const prodName = it.product_name.trim();
         const qty = Math.max(1, Math.floor(it.quantity || 1));
 
-        // Ensure master product exists
+        // Ensure master product exists in catalog
         await query(
           `INSERT INTO public.master_products (name, category) VALUES ($1, 'كتاب مدرسي') ON CONFLICT (name) DO NOTHING;`,
           [prodName]
         );
 
-        // Pre-check available stock for this product
-        const prodRows = await query<MasterProduct>(
-          `SELECT available_stock FROM public.master_products WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) LIMIT 1;`,
-          [prodName]
-        );
-
-        const currentAvailable = prodRows[0]?.available_stock || 0;
-        let isInStock = false;
-        let fulfilledQty = 0;
-
-        if (currentAvailable >= qty) {
-          isInStock = true;
-          fulfilledQty = qty;
-          // Deduct allocated stock from master_products
-          await query(
-            `UPDATE public.master_products 
-             SET available_stock = available_stock - $1 
-             WHERE LOWER(TRIM(name)) = LOWER(TRIM($2));`,
-            [qty, prodName]
-          );
-        }
-
+        // Every newly added demand item ALWAYS starts as unfulfilled pending deficit
         await query(
-          `INSERT INTO public.demand_items (demand_id, product_name, quantity, fulfilled_quantity, is_in_stock, is_delivered)
-           VALUES ($1, $2, $3, $4, $5, false);`,
-          [demandId, prodName, qty, fulfilledQty, isInStock]
+          `INSERT INTO public.demand_items (demand_id, product_name, quantity, fulfilled_quantity, is_in_stock, is_delivered, status)
+           VALUES ($1, $2, $3, 0, false, false, 'pending');`,
+          [demandId, prodName, qty]
         );
       }
 
@@ -278,6 +257,14 @@ export async function POST(request: Request) {
       );
       const batchId = batchRows[0]?.id;
 
+      // Ensure master product exists in catalog
+      await query(
+        `INSERT INTO public.master_products (name, category)
+         VALUES ($1, 'كتاب مدرسي')
+         ON CONFLICT (name) DO NOTHING;`,
+        [cleanName]
+      );
+
       // Select matching pending demand_items in active batch ordered by client_demands.created_at ASC
       const pendingItems = await query<any>(
         `SELECT 
@@ -355,15 +342,8 @@ export async function POST(request: Request) {
         }
       }
 
-      if (remainingQty > 0) {
-        await query(
-          `INSERT INTO public.master_products (name, category, available_stock)
-           VALUES ($1, 'كتاب مدرسي', $2)
-           ON CONFLICT (name) DO UPDATE 
-           SET available_stock = GREATEST(0, COALESCE(master_products.available_stock, 0) + EXCLUDED.available_stock);`,
-          [cleanName, remainingQty]
-        );
-      }
+      // BUSINESS RULE: If received stock exceeds the total demanded quantity, surplus is discarded.
+      // Do NOT store leftover stock in the database. The system only tracks fulfilling pending deficits.
 
       const allocatedClients = Object.values(allocatedClientsMap).map(c => {
         let rawPhone = c.phone.replace(/\D/g, '');
@@ -377,7 +357,7 @@ export async function POST(request: Request) {
         };
       });
 
-      return NextResponse.json({ success: true, allocatedClients, surplusQty: remainingQty });
+      return NextResponse.json({ success: true, allocatedClients });
     }
 
     // --- MARK EN RUPTURE (Out of Stock) ---
@@ -434,16 +414,7 @@ export async function POST(request: Request) {
 
     // --- UPDATE MASTER PRODUCT STOCK ---
     if (action === 'update_stock') {
-      const { productName, deltaQty } = body;
-      const cleanName = productName.trim();
-      const delta = parseInt(deltaQty) || 0;
-
-      await query(
-        `UPDATE public.master_products 
-         SET available_stock = GREATEST(0, COALESCE(available_stock, 0) + $1) 
-         WHERE name = $2;`,
-        [delta, cleanName]
-      );
+      // In a pure demand tracker, positive available_stock is not tracked
       return NextResponse.json({ success: true });
     }
 

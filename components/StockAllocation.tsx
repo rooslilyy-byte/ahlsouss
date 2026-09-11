@@ -12,7 +12,6 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { ClientDemand, MasterProduct } from '@/lib/types';
-import { updateMasterProductStock } from '@/lib/dataStore';
 
 type ViewTab = 'normal' | 'rupture';
 type SortOption = 'alphabetical' | 'oldest' | 'newest';
@@ -295,9 +294,6 @@ export default function StockAllocation({
                 }
               }
             }
-          }
-          if (remaining > 0) {
-            await updateMasterProductStock(productName, remaining);
           }
         }
       }
