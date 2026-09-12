@@ -12,6 +12,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { ClientDemand, MasterProduct } from '@/lib/types';
+import { compareProductNames } from '@/lib/sortUtils';
 
 type ViewTab = 'normal' | 'rupture';
 type SortOption = 'alphabetical' | 'oldest' | 'newest';
@@ -152,17 +153,7 @@ export default function StockAllocation({
   const sortAggregatedProducts = (list: AggregatedProduct[], sort: SortOption) => {
     return [...list].sort((a, b) => {
       if (sort === 'alphabetical') {
-        const aArabic = isArabic(a.productName);
-        const bArabic = isArabic(b.productName);
-
-        // Arabic product names first (أ to ي), followed by Latin/French product names (A to Z)
-        if (aArabic && !bArabic) return -1;
-        if (!aArabic && bArabic) return 1;
-
-        if (aArabic && bArabic) {
-          return a.productName.localeCompare(b.productName, 'ar', { sensitivity: 'base' });
-        }
-        return a.productName.localeCompare(b.productName, 'fr', { sensitivity: 'base' });
+        return compareProductNames(a.productName, b.productName);
       }
 
       if (sort === 'oldest') {

@@ -22,6 +22,7 @@ import {
   Edit
 } from 'lucide-react';
 import { ClientDemand, MasterProduct } from '@/lib/types';
+import { compareProductNames } from '@/lib/sortUtils';
 import ThermalReceiptModal from './ThermalReceiptModal';
 import EditDemandModal from './EditDemandModal';
 import ProductAutocomplete from './ProductAutocomplete';
@@ -359,7 +360,8 @@ export default function DemandsList({
             {/* Compact Rows */}
             {filteredDemands.map((demand, idx) => {
               const totalItems = demand.items?.length || 0;
-              const missingItems = demand.items?.filter(i => !i.is_in_stock && !i.is_delivered) || [];
+              const missingItems = (demand.items?.filter(i => !i.is_in_stock && !i.is_delivered) || [])
+                .sort((a, b) => compareProductNames(a.product_name, b.product_name));
               const missingCount = missingItems.length;
 
               const isExpanded = expandedDemandId === demand.id;

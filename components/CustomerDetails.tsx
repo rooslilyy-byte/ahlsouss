@@ -19,6 +19,7 @@ import {
   Clock
 } from 'lucide-react';
 import { ClientDemand, MasterProduct } from '@/lib/types';
+import { compareProductNames } from '@/lib/sortUtils';
 import ThermalReceiptModal from './ThermalReceiptModal';
 import EditDemandModal from './EditDemandModal';
 
@@ -66,6 +67,11 @@ export default function CustomerDetails({
       d.client?.id === cleanId
     ) || null;
   }, [demands, id]);
+
+  const sortedItems = useMemo(() => {
+    if (!targetDemand?.items) return [];
+    return [...targetDemand.items].sort((a, b) => compareProductNames(a.product_name, b.product_name));
+  }, [targetDemand?.items]);
 
   const stats = useMemo(() => {
     if (!targetDemand || !targetDemand.items) {
@@ -269,7 +275,7 @@ export default function CustomerDetails({
 
         {/* Product Items List - Minimalist Compact Rows */}
         <div className="space-y-1.5">
-          {targetDemand.items?.map((item, idx) => {
+          {sortedItems.map((item, idx) => {
             const isInStock = item.is_in_stock;
             const isDelivered = item.is_delivered;
             const fulfilledQty = item.fulfilled_quantity || 0;

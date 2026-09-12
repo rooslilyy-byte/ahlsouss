@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { Printer, FileText, ShoppingCart, CheckCircle2, AlertCircle } from 'lucide-react';
 import { SupplierAggregatedItem, PurchaseBatch, ClientDemand } from '@/lib/types';
 import { getSupplierAggregatedReport } from '@/lib/dataStore';
+import { compareProductNames } from '@/lib/sortUtils';
 
 interface SupplierBuyingSheetProps {
   activeBatch: PurchaseBatch | null;
@@ -86,7 +87,7 @@ export default function SupplierBuyingSheet({
       }
     }
 
-    const sortFn = (a: SupplierAggregatedItem, b: SupplierAggregatedItem) => b.totalQuantity - a.totalQuantity;
+    const sortFn = (a: SupplierAggregatedItem, b: SupplierAggregatedItem) => compareProductNames(a.productName, b.productName);
 
     return {
       normalReport: Object.values(normalMap).sort(sortFn),
@@ -99,6 +100,11 @@ export default function SupplierBuyingSheet({
 
   const currentReport = activeTab === 'normal' ? normalList : ruptureList;
 
+  // Alphabetical sorting (Arabic first أ-ي, then French/Latin A-Z) right before rendering table rows
+  const sortedReport = useMemo(() => {
+    return [...currentReport].sort((a, b) => compareProductNames(a.productName, b.productName));
+  }, [currentReport]);
+
   const handlePrint = () => {
     window.print();
   };
@@ -106,8 +112,8 @@ export default function SupplierBuyingSheet({
   const normalCount = normalList.length;
   const ruptureCount = ruptureList.length;
 
-  const totalItemTypes = currentReport.length;
-  const totalPiecesCount = currentReport.reduce((acc, curr) => acc + curr.totalQuantity, 0);
+  const totalItemTypes = sortedReport.length;
+  const totalPiecesCount = sortedReport.reduce((acc, curr) => acc + curr.totalQuantity, 0);
 
   const reportTitle = activeTab === 'normal' ? 'تقرير مشتريات الموردين' : 'تقرير السلع غير المتوفرة';
   const reportSubtitle = activeTab === 'normal'
@@ -208,7 +214,7 @@ export default function SupplierBuyingSheet({
       <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-3.5 shadow-2xs no-print">
         {isLoading ? (
           <div className="text-center py-8 text-slate-500 font-medium text-xs">جاري تحميل تقرير المشتريات...</div>
-        ) : currentReport.length === 0 ? (
+        ) : sortedReport.length === 0 ? (
           activeTab === 'normal' ? (
             <div className="text-center py-8 border border-dashed border-emerald-200 bg-emerald-50/50 rounded-lg space-y-1.5">
               <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
@@ -230,7 +236,7 @@ export default function SupplierBuyingSheet({
           <>
             {/* Mobile Stacked Card View (< md) */}
             <div className="block md:hidden space-y-2">
-              {currentReport.map((item, idx) => (
+              {sortedReport.map((item, idx) => (
                 <div key={idx} className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 space-y-1.5">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
@@ -270,7 +276,7 @@ export default function SupplierBuyingSheet({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {currentReport.map((item, idx) => (
+                  {sortedReport.map((item, idx) => (
                     <tr key={idx} className="hover:bg-slate-50 transition-colors">
                       <td className="py-2 px-3 text-center font-bold text-slate-400">{idx + 1}</td>
                       <td className="py-2 px-3 font-semibold text-slate-900 text-xs sm:text-sm">{item.productName}</td>
@@ -330,7 +336,7 @@ export default function SupplierBuyingSheet({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-300">
-                {currentReport.map((item, idx) => (
+                {sortedReport.map((item, idx) => (
                   <tr key={idx}>
                     <td className="py-3 px-3 text-center font-bold">{idx + 1}</td>
                     <td className="py-3 px-3 font-extrabold text-sm">{item.productName}</td>
