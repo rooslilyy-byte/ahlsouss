@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, X } from 'lucide-react';
 import { ClientDemand } from '@/lib/types';
-import { compareProductNames } from '@/lib/sortUtils';
 
 interface ThermalReceiptProps {
   demand: ClientDemand;
@@ -17,12 +16,6 @@ export default function ThermalReceipt({ demand, onClose }: ThermalReceiptProps)
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  // Sort client's demanded items array alphabetically (Arabic first أ-ي, then French/Latin A-Z)
-  const sortedItems = useMemo(() => {
-    if (!demand?.items) return [];
-    return [...demand.items].sort((a, b) => compareProductNames(a.product_name, b.product_name));
-  }, [demand?.items]);
 
   const handlePrint = () => {
     window.print();
@@ -97,7 +90,7 @@ export default function ThermalReceipt({ demand, onClose }: ThermalReceiptProps)
           </tr>
         </thead>
         <tbody>
-          {sortedItems.map((item, idx) => (
+          {demand.items?.map((item, idx) => (
             <tr key={item.id || idx} className="border-b border-slate-300">
               <td className="py-1 px-0.5 text-center font-bold">{idx + 1}</td>
               <td className="py-1 px-1 font-semibold leading-tight">{item.product_name}</td>
